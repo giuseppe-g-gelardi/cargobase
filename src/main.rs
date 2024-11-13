@@ -1,6 +1,6 @@
 mod database;
 
-use database::database::{Database, Table};
+use database::database::{Column, Columns, Database, Table};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::error::Error;
@@ -18,10 +18,14 @@ const DATABASE_NAME: &str = "cargobase";
 
 fn main() -> Result<(), Box<dyn Error>> {
     let mut db = Database::new(DATABASE_NAME.to_string());
-    let mut users_table = Table::new(
-        "Users".to_string(),
-        vec!["id".to_string(), "name".to_string(), "age".to_string()],
-    );
+
+    let columns = Columns::new(vec![
+        Column::new("id", true),
+        Column::new("name", true),
+        Column::new("age", true),
+    ]);
+
+    let mut users_table = Table::new("Users".to_string(), columns);
 
     db.add_table(&mut users_table);
 
@@ -37,9 +41,15 @@ fn main() -> Result<(), Box<dyn Error>> {
         age: "25".to_string(),
     };
 
-    // users_table.add_row(serde_json::from_value(json!(user1))?);
-    db.add_row("Users", json!(user1));
-    db.add_row("Users", json!(user2));
+    let users = vec![user1, user2];
+
+    for user in users {
+        if let Err(e) = db.add_row("Users", json!(user)) {
+            println!("Failed to add row for user {}: {}", user.name, e);
+        } else {
+            ()
+        }
+    }
 
     println!("db: {:#?}", db);
     Ok(())
