@@ -6,6 +6,8 @@ use serde_json::json;
 use std::error::Error;
 use uuid::Uuid;
 
+use once_cell::sync::Lazy;
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct User {
     pub id: String,
@@ -14,7 +16,7 @@ pub struct User {
 }
 
 const DATABASE_NAME: &str = "cargobase";
-// const FILE_NAME: &str = "cargobase.json";
+static FILE_NAME: Lazy<String> = Lazy::new(|| format!("{}.json", DATABASE_NAME));
 
 fn main() -> Result<(), Box<dyn Error>> {
     let mut db = Database::new(DATABASE_NAME.to_string());
