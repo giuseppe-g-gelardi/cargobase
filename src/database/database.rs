@@ -1,4 +1,3 @@
-use super::rows::Row;
 use super::tables::Table;
 use serde::{Deserialize, Serialize};
 
@@ -6,8 +5,6 @@ use serde::{Deserialize, Serialize};
 pub struct Database {
     name: String, // get name from command line args
     tables: Vec<Table>,
-    rows: Vec<Row>,
-    data: Vec<String>,
 }
 
 impl Database {
@@ -15,8 +12,10 @@ impl Database {
         Database {
             name: String::from("cargobase"),
             tables: Vec::new(),
-            rows: Vec::new(),
-            data: Vec::new(),
         }
+    }
+
+    pub fn add_table(&mut self, table: Table) {
+        self.tables.push(table);
     }
 }
