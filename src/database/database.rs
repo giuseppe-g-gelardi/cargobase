@@ -16,11 +16,16 @@ impl Database {
         }
     }
 
-    // let db = Database::new("mydb".to_string());
-    // -- will create a new database with name "mydb" and an empty tables vector
-
     pub fn add_table(&mut self, table: &mut Table) {
         self.tables.push(table.clone());
+    }
+
+    pub fn add_row(&mut self, table_name: &str, data: Value) {
+        if let Some(table) = self.tables.iter_mut().find(|t| t.name == table_name) {
+            table.add_row(data);
+        } else {
+            println!("Table not found");
+        }
     }
 }
 
@@ -32,23 +37,32 @@ pub struct Table {
 }
 
 impl Table {
-    pub fn new(name: String, columns: Vec<String>, rows: Vec<Row>) -> Self {
+    pub fn new(name: String, columns: Vec<String>) -> Self {
         Table {
             name,
-            rows,
+            rows: Vec::new(),
             columns,
         }
     }
 
-    // let table = Table::new(
-    //     "table_name".to_string(),
-    //     vec![], // rows
-    //     vec![]  // columns
-    // )
-    // -- will create a new table with name "table_name",
-    //    an empty rows vector and an empty columns vector
+    // pub fn add_row(&mut self, data: Value) {
+    //     let row = Row::new(data);
+    //     self.rows.push(row);
+    // }
 
-    pub fn add_row(&mut self, row: Row) {
+    pub fn add_row(&mut self, data: Value) {
+        if let Some(obj) = data.as_object() {
+            for column in &self.columns {
+                if !obj.contains_key(column) {
+                    println!("Missing required column: {}", column);
+                    return;
+                }
+            }
+        } else {
+            println!("Invalid data format: expected a JSON object.");
+            return;
+        }
+        let row = Row::new(data);
         self.rows.push(row);
     }
 }
@@ -64,13 +78,4 @@ impl Row {
         let _id = Uuid::new_v4().to_string();
         Row { _id, data }
     }
-
-    pub fn add_record(&mut self, key: &str, value: Value) {
-        self.data[key] = value;
-    }
-
-    // let my_struct = MyStruct { id: uuid, name: "my name".to_string() };
-    // let row = Row::new(serde_json::to_value(my_struct).unwrap());
-    // -- will create a new row with a unique id
-    // -- and a data field containing the serialized struct
 }
