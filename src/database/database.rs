@@ -4,7 +4,7 @@ use uuid::Uuid;
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct Database {
-    pub name: String, // get name from command line args
+    pub name: String, // get name from command line args?
     pub tables: Vec<Table>,
 }
 
@@ -20,12 +20,35 @@ impl Database {
         self.tables.push(table.clone());
     }
 
-    pub fn add_row(&mut self, table_name: &str, data: Value) -> Result<(), String> {
+    pub fn save_to_file(&self, file_name: &str) -> Result<(), std::io::Error> {
+        let json_data = serde_json::to_string_pretty(&self)?;
+        std::fs::write(file_name, json_data)?;
+        Ok(())
+    }
+
+    // pub fn load_from_file(file_name: &str) -> Result<Self, std::io::Error> {
+    //     let json_data = std::fs::read_to_string(file_name)?;
+    //     let db: Database = serde_json::from_str(&json_data)?;
+    //     Ok(db)
+    // }
+
+    pub fn add_row(
+        &mut self,
+        table_name: &str,
+        data: Value,
+        file_name: &str,
+    ) -> Result<(), String> {
         if let Some(table) = self.tables.iter_mut().find(|t| t.name == table_name) {
-            // table.add_row(data);
-            Ok(table.add_row(data)?)
+            if let Err(e) = table.add_row(data) {
+                return Err(format!("Failed to add row: {}", e));
+            }
+
+            if let Err(e) = self.save_to_file(file_name) {
+                return Err(format!("Failed to save to file: {}", e));
+            }
+
+            Ok(())
         } else {
-            // println!("Table not found");
             Err(format!("Table {} not found", table_name))
         }
     }
@@ -47,33 +70,12 @@ impl Table {
         }
     }
 
-    // pub fn add_row(&mut self, data: Value) {
-    //     let row = Row::new(data);
-    //     self.rows.push(row);
-    // }
-
     pub fn add_row(&mut self, data: Value) -> Result<(), String> {
         self.columns.validate(&data)?;
         let row = Row::new(data);
         self.rows.push(row);
         Ok(())
     }
-
-    // pub fn add_row(&mut self, data: Value) {
-    //     if let Some(obj) = data.as_object() {
-    //         for column in &self.columns {
-    //             if !obj.contains_key(column) {
-    //                 println!("Missing required column: {}", column);
-    //                 return;
-    //             }
-    //         }
-    //     } else {
-    //         println!("Invalid data format: expected a JSON object.");
-    //         return;
-    //     }
-    //     let row = Row::new(data);
-    //     self.rows.push(row);
-    // }
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]

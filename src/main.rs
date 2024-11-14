@@ -46,11 +46,26 @@ fn main() -> Result<(), Box<dyn Error>> {
     let users = vec![user1, user2];
 
     for user in users {
-        if let Err(e) = db.add_row("Users", json!(user)) {
+        if let Err(e) = db.add_row("Users", json!(user), &FILE_NAME) {
             println!("Failed to add row for user {}: {}", user.name, e);
         } else {
             ()
         }
+    }
+
+    println!("db: {:#?}", db);
+
+
+    let user3 = User {
+        id: Uuid::new_v4().to_string(),
+        name: "apple banana".to_string(),
+        age: "420".to_string(),
+    };
+
+    if let Err(e) = db.add_row("Users", json!(user3), &FILE_NAME) {
+        println!("Failed to add row for user {}: {}", user3.name, e);
+    } else {
+        ()
     }
 
     println!("db: {:#?}", db);
