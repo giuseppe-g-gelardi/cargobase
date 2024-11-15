@@ -15,9 +15,10 @@ impl Database {
         let file_name = format!("{}.json", name);
 
         if std::path::Path::new(&file_name).exists() {
-            println!("Database {} already exists, Loading from file.", file_name);
-            let db = Database::load_from_file(&file_name).unwrap();
-            return db;
+            // println!("Database {} already exists, Loading from file.", file_name);
+            // let db = Database::load_from_file(&file_name).unwrap();
+            // return db;
+            return Database::load_from_file(&file_name).unwrap();
         } else {
             println!("Creating new database: {}", file_name);
 
@@ -113,33 +114,41 @@ impl Query {
         }
     }
 
-    pub fn where_eq<T: DeserializeOwned>(self, key: &str, value: &str) -> Option<T> {
-        let db = Database::load_from_file(&self.db_file_name).unwrap_or_else(|e| {
-            eprintln!("Failed to load database from file: {}", e);
-            Database {
-                name: String::new(),
-                file_name: self.db_file_name.clone(),
-                tables: Vec::new(),
-            }
-        });
+    // pub fn where_eq<T: DeserializeOwned>(self, key: &str, value: &str) -> Option<T> {
+    pub fn where_eq<T: DeserializeOwned>(self, key: &str, value: &str) -> Result<T, String> {
+        // let db = Database::load_from_file(&self.db_file_name).unwrap_or_else(|e| {
+        //     eprintln!("Failed to load database from file: {}", e);
+        //     Database {
+        //         name: String::new(),
+        //         file_name: self.db_file_name.clone(),
+        //         tables: Vec::new(),
+        //     }
+        // });
+        let db = Database::load_from_file(&self.db_file_name)
+            .map_err(|e| format!("Failed to load database from file: {}", e))?;
 
         if let Some(table_name) = &self.table_name {
             if let Some(table) = db.tables.iter().find(|t| t.name == *table_name) {
                 for row in &table.rows {
                     if let Some(obj) = row.data.get(key) {
                         if obj.as_str() == Some(value) {
-                            return serde_json::from_value(row.data.clone()).ok();
+                            // return serde_json::from_value(row.data.clone()).ok();
+                            return serde_json::from_value(row.data.clone())
+                                .map_err(|e| format!("Deserialization error: {}", e));
                         }
                     }
                 }
-                eprintln!("No matching row found");
+                // eprintln!("No matching row found");
+                Err(format!("No matching row found"))
             } else {
-                eprintln!("Table {} not found", table_name);
+                Err(format!("Table {} not found", table_name))
+                // eprintln!("Table {} not found", table_name);
             }
         } else {
-            eprintln!("Table name not provided");
+            // eprintln!("Table name not provided");
+            Err(format!("Table name not provided"))
         }
-        None
+        // None
     }
 
     // pub fn from<T: DeserializeOwned>(&self, table_name: &str) -> Vec<T> {

@@ -74,10 +74,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // println!("db: {:#?}", db);
 
-    let single_user: Option<User> = db
+    let single_user: User = db
         .get_single()
         .from("Users")
-        .where_eq("id", "39fe81e3-23a3-4212-b608-c4d11b33d995");
+        .where_eq("id", "39fe81e3-23a3-4212-b608-c4d11b33d995")?;
 
     println!("{:#?}", single_user);
 
