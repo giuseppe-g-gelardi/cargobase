@@ -59,22 +59,34 @@ impl Database {
         self.tables.iter_mut().find(|t| t.name == table_name)
     }
 
-    // pub fn get_rows(&self, table_name: &str) -> Option<&Vec<Row>> {
-    //     self.tables.iter().find(|t| t.name == table_name).map(|t| &t.rows)
-    // }
     pub fn get_rows(&self) -> Query {
         Query {
             db_file_name: self.file_name.clone(),
+            table_name: None,
+        }
+    }
+
+    pub fn get_single(&self) -> Query {
+        Query {
+            db_file_name: self.file_name.clone(),
+            table_name: None,
         }
     }
 }
 
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct Query {
     db_file_name: String,
+    table_name: Option<String>,
 }
 
 impl Query {
-    pub fn from<T: DeserializeOwned>(&self, table_name: &str) -> Vec<T> {
+    pub fn from(mut self, table_name: &str) -> Self {
+        self.table_name = Some(table_name.to_string());
+        self
+    }
+
+    pub fn all<T: DeserializeOwned>(&self) -> Vec<T> {
         let db = Database::load_from_file(&self.db_file_name).unwrap_or_else(|e| {
             eprintln!("Failed to load database from file: {}", e);
             Database {
@@ -84,18 +96,74 @@ impl Query {
             }
         });
 
-        if let Some(table) = db.tables.iter().find(|t| t.name == table_name) {
-            // table.rows.clone()
-            table
-                .rows
-                .iter()
-                .filter_map(|row| serde_json::from_value(row.data.clone()).ok())
-                .collect()
+        if let Some(table_name) = &self.table_name {
+            if let Some(table) = db.tables.iter().find(|t| t.name == *table_name) {
+                table
+                    .rows
+                    .iter()
+                    .filter_map(|row| serde_json::from_value(row.data.clone()).ok())
+                    .collect()
+            } else {
+                eprintln!("Table {} not found", table_name);
+                Vec::new()
+            }
         } else {
-            eprintln!("Table {} not found", table_name);
+            eprintln!("Table name not provided");
             Vec::new()
         }
     }
+
+    pub fn where_eq<T: DeserializeOwned>(self, key: &str, value: &str) -> Option<T> {
+        let db = Database::load_from_file(&self.db_file_name).unwrap_or_else(|e| {
+            eprintln!("Failed to load database from file: {}", e);
+            Database {
+                name: String::new(),
+                file_name: self.db_file_name.clone(),
+                tables: Vec::new(),
+            }
+        });
+
+        if let Some(table_name) = &self.table_name {
+            if let Some(table) = db.tables.iter().find(|t| t.name == *table_name) {
+                for row in &table.rows {
+                    if let Some(obj) = row.data.get(key) {
+                        if obj.as_str() == Some(value) {
+                            return serde_json::from_value(row.data.clone()).ok();
+                        }
+                    }
+                }
+                eprintln!("No matching row found");
+            } else {
+                eprintln!("Table {} not found", table_name);
+            }
+        } else {
+            eprintln!("Table name not provided");
+        }
+        None
+    }
+
+    // pub fn from<T: DeserializeOwned>(&self, table_name: &str) -> Vec<T> {
+    //     let db = Database::load_from_file(&self.db_file_name).unwrap_or_else(|e| {
+    //         eprintln!("Failed to load database from file: {}", e);
+    //         Database {
+    //             name: String::new(),
+    //             file_name: self.db_file_name.clone(),
+    //             tables: Vec::new(),
+    //         }
+    //     });
+    //
+    //     if let Some(table) = db.tables.iter().find(|t| t.name == table_name) {
+    //         // table.rows.clone()
+    //         table
+    //             .rows
+    //             .iter()
+    //             .filter_map(|row| serde_json::from_value(row.data.clone()).ok())
+    //             .collect()
+    //     } else {
+    //         eprintln!("Table {} not found", table_name);
+    //         Vec::new()
+    //     }
+    // }
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]

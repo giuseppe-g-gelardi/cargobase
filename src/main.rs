@@ -65,13 +65,21 @@ fn main() -> Result<(), Box<dyn Error>> {
     // posts_table.add_row(&mut db, json!(posts));
 
     // let all_rows = users_table.get_rows_all();
-    
-    let all_rows: Vec<User> = db.get_rows().from("Users");
-    all_rows.iter().for_each(|user| {
-        println!("{:#?}", user.id);
-    });
+
+    // let all_rows: Vec<User> = db.get_rows().from("Users").all();
+    // println!("{:#?}", all_rows);
+    // all_rows.iter().for_each(|user| {
+    //     println!("{:#?}", user.id);
+    // });
 
     // println!("db: {:#?}", db);
+
+    let single_user: Option<User> = db
+        .get_single()
+        .from("Users")
+        .where_eq("id", "39fe81e3-23a3-4212-b608-c4d11b33d995");
+
+    println!("{:#?}", single_user);
 
     Ok(())
 }
