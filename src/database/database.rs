@@ -1,3 +1,4 @@
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use uuid::Uuid;
@@ -42,7 +43,6 @@ impl Database {
     }
 
     fn save_to_file(&self) -> Result<(), std::io::Error> {
-        // let json_data = serde_json::to_vec(&self)?;
         let json_data = serde_json::to_string_pretty(&self)?;
         std::fs::write(&self.file_name, json_data)?;
         println!("Database saved to file: {}", self.file_name);
@@ -57,6 +57,44 @@ impl Database {
 
     fn get_table_mut(&mut self, table_name: &str) -> Option<&mut Table> {
         self.tables.iter_mut().find(|t| t.name == table_name)
+    }
+
+    // pub fn get_rows(&self, table_name: &str) -> Option<&Vec<Row>> {
+    //     self.tables.iter().find(|t| t.name == table_name).map(|t| &t.rows)
+    // }
+    pub fn get_rows(&self) -> Query {
+        Query {
+            db_file_name: self.file_name.clone(),
+        }
+    }
+}
+
+pub struct Query {
+    db_file_name: String,
+}
+
+impl Query {
+    pub fn from<T: DeserializeOwned>(&self, table_name: &str) -> Vec<T> {
+        let db = Database::load_from_file(&self.db_file_name).unwrap_or_else(|e| {
+            eprintln!("Failed to load database from file: {}", e);
+            Database {
+                name: String::new(),
+                file_name: self.db_file_name.clone(),
+                tables: Vec::new(),
+            }
+        });
+
+        if let Some(table) = db.tables.iter().find(|t| t.name == table_name) {
+            // table.rows.clone()
+            table
+                .rows
+                .iter()
+                .filter_map(|row| serde_json::from_value(row.data.clone()).ok())
+                .collect()
+        } else {
+            eprintln!("Table {} not found", table_name);
+            Vec::new()
+        }
     }
 }
 
