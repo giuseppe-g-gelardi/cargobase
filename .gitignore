@@ -21,3 +21,5 @@ Cargo.lock
 #.idea/
 
 cargobase.json
+
+src/main.rs
