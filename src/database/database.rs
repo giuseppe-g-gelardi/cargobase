@@ -73,6 +73,75 @@ impl Database {
             table_name: None,
         }
     }
+
+    pub fn view(&self) {
+        println!("Database: {}", self.name);
+
+        for table in &self.tables {
+            println!("\nTable: {}", table.name);
+
+            if table.columns.0.is_empty() {
+                println!("No columns defined for table '{}'.", table.name);
+                continue;
+            }
+
+            // Get column names and determine maximum width for each column
+            let column_names: Vec<&str> = table
+                .columns
+                .0
+                .iter()
+                .map(|col| col.name.as_str())
+                .collect();
+            let mut column_widths: Vec<usize> =
+                column_names.iter().map(|name| name.len()).collect();
+
+            // Adjust column widths based on the content of each row
+            for row in &table.rows {
+                for (i, column) in table.columns.0.iter().enumerate() {
+                    let value = row
+                        .data
+                        .get(&column.name)
+                        .unwrap_or(&serde_json::Value::Null)
+                        .to_string();
+                    column_widths[i] = column_widths[i].max(value.len());
+                }
+            }
+
+            // Print the header row
+            let header: Vec<String> = column_names
+                .iter()
+                .enumerate()
+                .map(|(i, &name)| format!("{:<width$}", name, width = column_widths[i]))
+                .collect();
+            println!("{}", header.join(" | "));
+
+            // Print a separator line
+            let separator: Vec<String> = column_widths
+                .iter()
+                .map(|&width| "-".repeat(width))
+                .collect();
+            println!("{}", separator.join("-+-"));
+
+            // Print each row of data
+            for row in &table.rows {
+                let row_data: Vec<String> = table
+                    .columns
+                    .0
+                    .iter()
+                    .enumerate()
+                    .map(|(i, column)| {
+                        let value = row
+                            .data
+                            .get(&column.name)
+                            .unwrap_or(&serde_json::Value::Null)
+                            .to_string();
+                        format!("{:<width$}", value, width = column_widths[i])
+                    })
+                    .collect();
+                println!("{}", row_data.join(" | "));
+            }
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
