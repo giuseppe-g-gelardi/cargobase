@@ -6,8 +6,6 @@ use serde_json::json;
 use std::error::Error;
 use uuid::Uuid;
 
-use once_cell::sync::Lazy;
-
 #[derive(Debug, Serialize, Deserialize)]
 pub struct User {
     pub id: String,
@@ -15,21 +13,26 @@ pub struct User {
     pub age: String,
 }
 
-const DATABASE_NAME: &str = "cargobase";
-static FILE_NAME: Lazy<String> = Lazy::new(|| format!("{}.json", DATABASE_NAME));
-
 fn main() -> Result<(), Box<dyn Error>> {
-    let mut db = Database::new(DATABASE_NAME.to_string());
+    let mut db = Database::new("cargobase".to_string());
 
-    let columns = Columns::new(vec![
+    let user_columns = Columns::new(vec![
         Column::new("id", true),
         Column::new("name", true),
         Column::new("age", true),
     ]);
 
-    let mut users_table = Table::new("Users".to_string(), columns);
+    let post_columns = Columns::new(vec![
+        Column::new("id", true),
+        Column::new("title", true),
+        Column::new("content", true),
+    ]);
+
+    let mut users_table = Table::new("Users".to_string(), user_columns);
+    let mut posts_table = Table::new("Posts".to_string(), post_columns);
 
     db.add_table(&mut users_table);
+    db.add_table(&mut posts_table);
 
     let user1 = User {
         id: Uuid::new_v4().to_string(),
@@ -43,31 +46,25 @@ fn main() -> Result<(), Box<dyn Error>> {
         age: "25".to_string(),
     };
 
+    let posts = vec![
+        json!({
+            "id": Uuid::new_v4().to_string(),
+            "title": "Hello, world!",
+            "content": "This is my first post.",
+        }),
+        json!({
+            "id": Uuid::new_v4().to_string(),
+            "title": "Hello, again!",
+            "content": "This is my second post.",
+        }),
+    ];
+
     let users = vec![user1, user2];
 
-    for user in users {
-        if let Err(e) = db.add_row("Users", json!(user), &FILE_NAME) {
-            println!("Failed to add row for user {}: {}", user.name, e);
-        } else {
-            ()
-        }
-    }
+    users_table.add_row(&mut db, json!(users));
+    posts_table.add_row(&mut db, json!(posts));
 
     println!("db: {:#?}", db);
 
-
-    let user3 = User {
-        id: Uuid::new_v4().to_string(),
-        name: "apple banana".to_string(),
-        age: "420".to_string(),
-    };
-
-    if let Err(e) = db.add_row("Users", json!(user3), &FILE_NAME) {
-        println!("Failed to add row for user {}: {}", user3.name, e);
-    } else {
-        ()
-    }
-
-    println!("db: {:#?}", db);
     Ok(())
 }
