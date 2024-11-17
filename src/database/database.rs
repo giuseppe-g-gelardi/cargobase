@@ -46,8 +46,9 @@ impl Database {
 
         if let Some(index) = db.tables.iter().position(|t| t.name == table_name) {
             let removed_table = db.tables.remove(index);
-            println!("Table {} dropped", removed_table.name);
-            db.save_to_file().map_err(|e| format!("Failed to save database: {:?}", e))?;
+            println!("Table {} dropped successfully", removed_table.name);
+            db.save_to_file()
+                .map_err(|e| format!("Failed to save database: {:?}", e))?;
 
             self.tables = db.tables;
             Ok(())
@@ -247,10 +248,6 @@ impl Query {
             Err("Table name not specified.".to_string())
         }
     }
-
-    //
-    //
-    //
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
@@ -276,11 +273,6 @@ impl Table {
     }
 
     pub fn add_row(&mut self, db: &mut Database, data: Value) {
-        // self.validate_row(&data)?;
-        // if let Err(e) = self.validate_row(&data.clone()) {
-        //     println!("{}", e);
-        //     return;
-        // }
         if let Some(table) = db.get_table_mut(&self.name) {
             if data.is_array() {
                 if let Some(array) = data.as_array() {
@@ -354,44 +346,4 @@ impl Columns {
     pub fn new(columns: Vec<Column>) -> Self {
         Columns(columns)
     }
-
-    // pub fn validate(&self, data: &Value) -> Result<(), String> {
-    //     if let Some(obj) = data.as_object() {
-    //         for column in &self.0 {
-    //             if column.required && !obj.contains_key(&column.name) {
-    //                 return Err(format!("Missing required column: {}", column.name));
-    //             }
-    //         }
-    //         Ok(())
-    //     } else {
-    //         Err("Invalid data format: expected a JSON object.".to_string())
-    //     }
-    // }
 }
-
-///////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////
-
-// pub fn _deprecated_where_eq_as_reference<T: DeserializeOwned>(self, key: &str, value: &str) -> Result<T, String> {
-//     let db = Database::load_from_file(&self.db_file_name)
-//         .map_err(|e| format!("Failed to load database from file: {}", e))?;
-//
-//     if let Some(table_name) = &self.table_name {
-//         if let Some(table) = db.tables.iter().find(|t| t.name == *table_name) {
-//             for row in &table.rows {
-//                 if let Some(obj) = row.data.get(key) {
-//                     if obj.as_str() == Some(value) {
-//                         return serde_json::from_value(row.data.clone())
-//                             .map_err(|e| format!("Deserialization error: {}", e));
-//                     }
-//                 }
-//             }
-//             Err(format!("No matching row found"))
-//         } else {
-//             Err(format!("Table {} not found", table_name))
-//         }
-//     } else {
-//         Err(format!("Table name not provided"))
-//     }
-// }
