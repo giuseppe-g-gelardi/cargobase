@@ -40,6 +40,15 @@ impl Database {
         }
     }
 
+    pub fn drop_table(&mut self, table_name: &str) {
+        if let Some(index) = self.tables.iter().position(|t| t.name == table_name) {
+            self.tables.remove(index);
+            println!("Table {} dropped.", table_name);
+        } else {
+            println!("Table {} not found.", table_name);
+        }
+    }
+
     fn save_to_file(&self) -> Result<(), std::io::Error> {
         let json_data = serde_json::to_string_pretty(&self)?;
         std::fs::write(&self.file_name, json_data)?;
@@ -191,28 +200,28 @@ impl Query {
         }
     }
 
-    pub fn where_eq<T: DeserializeOwned>(self, key: &str, value: &str) -> Result<T, String> {
-        let db = Database::load_from_file(&self.db_file_name)
-            .map_err(|e| format!("Failed to load database from file: {}", e))?;
-
-        if let Some(table_name) = &self.table_name {
-            if let Some(table) = db.tables.iter().find(|t| t.name == *table_name) {
-                for row in &table.rows {
-                    if let Some(obj) = row.data.get(key) {
-                        if obj.as_str() == Some(value) {
-                            return serde_json::from_value(row.data.clone())
-                                .map_err(|e| format!("Deserialization error: {}", e));
-                        }
-                    }
-                }
-                Err(format!("No matching row found"))
-            } else {
-                Err(format!("Table {} not found", table_name))
-            }
-        } else {
-            Err(format!("Table name not provided"))
-        }
-    }
+    // pub fn _deprecated_where_eq_as_reference<T: DeserializeOwned>(self, key: &str, value: &str) -> Result<T, String> {
+    //     let db = Database::load_from_file(&self.db_file_name)
+    //         .map_err(|e| format!("Failed to load database from file: {}", e))?;
+    //
+    //     if let Some(table_name) = &self.table_name {
+    //         if let Some(table) = db.tables.iter().find(|t| t.name == *table_name) {
+    //             for row in &table.rows {
+    //                 if let Some(obj) = row.data.get(key) {
+    //                     if obj.as_str() == Some(value) {
+    //                         return serde_json::from_value(row.data.clone())
+    //                             .map_err(|e| format!("Deserialization error: {}", e));
+    //                     }
+    //                 }
+    //             }
+    //             Err(format!("No matching row found"))
+    //         } else {
+    //             Err(format!("Table {} not found", table_name))
+    //         }
+    //     } else {
+    //         Err(format!("Table name not provided"))
+    //     }
+    // }
 
     // pub fn from<T: DeserializeOwned>(&self, table_name: &str) -> Vec<T> {
     //     let db = Database::load_from_file(&self.db_file_name).unwrap_or_else(|e| {
@@ -238,7 +247,7 @@ impl Query {
     // }
 
     /// Fetch or delete a single row by a specific key-value pair
-    pub fn where_eqd<T: DeserializeOwned>(self, key: &str, value: &str) -> Result<T, String> {
+    pub fn where_eq<T: DeserializeOwned>(self, key: &str, value: &str) -> Result<T, String> {
         // Load the latest state of the database from the file
         let mut db = Database::load_from_file(&self.db_file_name)
             .map_err(|e| format!("Failed to load database from file: {}", e))?;
