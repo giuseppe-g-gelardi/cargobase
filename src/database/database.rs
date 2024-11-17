@@ -40,12 +40,19 @@ impl Database {
         }
     }
 
-    pub fn drop_table(&mut self, table_name: &str) {
-        if let Some(index) = self.tables.iter().position(|t| t.name == table_name) {
-            self.tables.remove(index);
-            println!("Table {} dropped.", table_name);
+    pub fn drop_table(&mut self, table_name: &str) -> Result<(), String> {
+        let mut db = Database::load_from_file(&self.file_name)
+            .map_err(|e| format!("Failed to laod database from file: {:?}", e))?;
+
+        if let Some(index) = db.tables.iter().position(|t| t.name == table_name) {
+            let removed_table = db.tables.remove(index);
+            println!("Table {} dropped", removed_table.name);
+            db.save_to_file().map_err(|e| format!("Failed to save database: {:?}", e))?;
+
+            self.tables = db.tables;
+            Ok(())
         } else {
-            println!("Table {} not found.", table_name);
+            Err(format!("Table {} not found", table_name))
         }
     }
 
@@ -269,6 +276,11 @@ impl Table {
     }
 
     pub fn add_row(&mut self, db: &mut Database, data: Value) {
+        // self.validate_row(&data)?;
+        // if let Err(e) = self.validate_row(&data.clone()) {
+        //     println!("{}", e);
+        //     return;
+        // }
         if let Some(table) = db.get_table_mut(&self.name) {
             if data.is_array() {
                 if let Some(array) = data.as_array() {
@@ -284,6 +296,25 @@ impl Table {
             });
         } else {
             println!("Table {} not found", self.name);
+        }
+    }
+
+    fn validate_row(&self, data: &Value) -> Result<(), String> {
+        if let Some(obj) = data.as_object() {
+            for column in &self.columns.0 {
+                if column.required && !obj.contains_key(&column.name) {
+                    return Err(format!("Missing required column: {}", column.name));
+                }
+            }
+
+            for key in obj.keys() {
+                if !self.columns.0.iter().any(|col| col.name == *key) {
+                    return Err(format!("Invalid column name: {}", key));
+                }
+            }
+            Ok(())
+        } else {
+            Err("Invalid data format: expected a JSON object.".to_string())
         }
     }
 }
