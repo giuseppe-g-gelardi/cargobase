@@ -347,3 +347,33 @@ impl Columns {
         Columns(columns)
     }
 }
+
+
+// impl Table {
+//     /// Add a new column to the table schema and update existing rows
+//     pub fn add_column(&mut self, column: Column, db: &mut Database) -> Result<(), String> {
+//         // Check if the column already exists
+//         if self.columns.0.iter().any(|col| col.name == column.name) {
+//             return Err(format!("Column '{}' already exists in table '{}'.", column.name, self.name));
+//         }
+//
+//         // Add the new column to the schema
+//         self.columns.0.push(column.clone());
+//         println!("Column '{}' added to table '{}'.", column.name, self.name);
+//
+//         // Update existing rows by adding the new column with an empty value
+//         for row in &mut self.rows {
+//             if !row.data.as_object().unwrap().contains_key(&column.name) {
+//                 row.data[&column.name] = serde_json::Value::Null; // Default to `null` or `Value::String("")`
+//             }
+//         }
+//
+//         // Save the updated table back to the database file
+//         if let Some(file_name) = &self.file_name {
+//             db.save_to_file().map_err(|e| format!("Failed to save table: {}", e))?;
+//         }
+//
+//         Ok(())
+//     }
+// }
+//
