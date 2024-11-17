@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use super::{Query, Table};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct Database {
@@ -9,7 +9,8 @@ pub struct Database {
 }
 
 impl Database {
-    pub fn new(name: String) -> Self {
+    pub fn new(name: &str) -> Self {
+        let name = name.to_string();
         let file_name = format!("{}.json", name);
 
         if std::path::Path::new(&file_name).exists() {
@@ -29,12 +30,16 @@ impl Database {
         }
     }
 
-    pub fn add_table(&mut self, table: &mut Table) {
+    pub fn add_table(&mut self, table: &mut Table) -> Result<(), String> {
         table.set_file_name(self.file_name.clone());
         if self.tables.iter().any(|t| t.name == table.name) {
-            println!("Table {} already exists, Skipping creation.", table.name);
+            Err(format!(
+                "Table {} already exists, Skipping creation.",
+                table.name
+            ))
         } else {
             self.tables.push(table.clone());
+            Ok(())
         }
     }
 
