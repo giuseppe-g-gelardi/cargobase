@@ -170,3 +170,52 @@ impl Database {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    #[test]
+    fn test_database_new() {
+        let file_name = "test.json";
+        if std::path::Path::new(file_name).exists() {
+            fs::remove_file(file_name).expect("Failed to remove test file");
+        }
+
+        let db = Database::new("test");
+        assert_eq!(db.name, "test");
+        assert_eq!(db.file_name, "test.json");
+        assert_eq!(db.tables.len(), 0);
+
+        if std::path::Path::new(file_name).exists() {
+            fs::remove_file(file_name).expect("Failed to remove test file");
+        }
+    }
+
+    use super::super::{Column, Columns};
+    use super::Table;
+
+    #[test]
+    fn test_database_add_table() {
+        let test_columns = vec![
+            Column::new("id", true),
+            Column::new("name", true),
+            Column::new("email", true),
+        ];
+
+        let mut test_db = Database::new("test");
+        let mut test_table = Table::new("test_table".to_string(), Columns::new(test_columns));
+
+        let result = test_db.add_table(&mut test_table);
+        assert_eq!(result, Ok(()));
+        assert_eq!(test_db.tables.len(), 1);
+
+        let result = test_db.add_table(&mut test_table);
+        assert_eq!(
+            result,
+            Err("Table test_table already exists, Skipping creation.".to_string())
+        );
+        assert_eq!(test_db.tables.len(), 1);
+    }
+}
