@@ -1,3 +1,3 @@
-cargobase...???
+cargobase
 
-maybe a redis like, local, development database
+a simple json database for local development in rust
