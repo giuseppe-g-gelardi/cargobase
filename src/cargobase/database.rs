@@ -60,20 +60,20 @@ impl Database {
         }
     }
 
-    pub fn save_to_file(&self) -> Result<(), std::io::Error> {
+    pub(crate) fn save_to_file(&self) -> Result<(), std::io::Error> {
         let json_data = serde_json::to_string_pretty(&self)?;
         std::fs::write(&self.file_name, json_data)?;
         println!("Database saved to file: {}", self.file_name);
         Ok(())
     }
 
-    pub fn load_from_file(file_name: &str) -> Result<Self, std::io::Error> {
+    pub(crate) fn load_from_file(file_name: &str) -> Result<Self, std::io::Error> {
         let json_data = std::fs::read_to_string(file_name)?;
         let db: Database = serde_json::from_str(&json_data)?;
         Ok(db)
     }
 
-    pub fn get_table_mut(&mut self, table_name: &str) -> Option<&mut Table> {
+    pub(crate) fn get_table_mut(&mut self, table_name: &str) -> Option<&mut Table> {
         self.tables.iter_mut().find(|t| t.name == table_name)
     }
 
