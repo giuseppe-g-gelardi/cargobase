@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct Column {
@@ -20,6 +21,19 @@ pub struct Columns(pub Vec<Column>);
 
 impl Columns {
     pub fn new(columns: Vec<Column>) -> Self {
+        Columns(columns)
+    }
+
+    pub fn from_struct<T: Serialize + Default>(required: bool) -> Self {
+        // pub fn from_struct<T: Serialize + Default>(required: bool) -> Result<Self, serde_json::Error> {
+        let value = json!(T::default());
+        // let value = serde_json::to_value(&T::default())?;
+        let columns = if let Value::Object(map) = value {
+            map.keys().map(|key| Column::new(key, required)).collect()
+        } else {
+            vec![]
+        };
+        // Ok(Columns(columns))
         Columns(columns)
     }
 }
