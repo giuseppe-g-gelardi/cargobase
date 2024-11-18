@@ -33,10 +33,8 @@ impl Database {
     pub fn add_table(&mut self, table: &mut Table) -> Result<(), String> {
         table.set_file_name(self.file_name.clone());
         if self.tables.iter().any(|t| t.name == table.name) {
-            Err(format!(
-                "Table {} already exists, Skipping creation.",
-                table.name
-            ))
+            eprintln!("Table {} already exists, Skipping creation.", table.name);
+            Ok(())
         } else {
             self.tables.push(table.clone());
             Ok(())
@@ -211,11 +209,9 @@ mod tests {
         assert_eq!(result, Ok(()));
         assert_eq!(test_db.tables.len(), 1);
 
+        // need to figure out a better way to handle the condition where the table already exists
         let result = test_db.add_table(&mut test_table);
-        assert_eq!(
-            result,
-            Err("Table test_table already exists, Skipping creation.".to_string())
-        );
+        assert_eq!(result, Ok(()));
         assert_eq!(test_db.tables.len(), 1);
     }
 }

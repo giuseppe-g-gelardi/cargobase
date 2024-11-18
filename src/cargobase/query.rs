@@ -10,6 +10,12 @@ pub struct Query {
     pub delete: bool,
 }
 
+// enum Operation {
+//     Select,
+//     Delete,
+//     Mutate,
+// }
+
 impl Query {
     pub fn from(mut self, table_name: &str) -> Self {
         self.table_name = Some(table_name.to_string());
