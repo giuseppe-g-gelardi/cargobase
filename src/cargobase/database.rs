@@ -1,4 +1,4 @@
-use super::{Query, Table};
+use super::{Query, query::Operation, Table};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
@@ -79,7 +79,7 @@ impl Database {
         Query {
             db_file_name: self.file_name.clone(),
             table_name: None,
-            delete: false,
+            operation: Operation::Select,
         }
     }
 
@@ -87,7 +87,7 @@ impl Database {
         Query {
             db_file_name: self.file_name.clone(),
             table_name: None,
-            delete: false,
+            operation: Operation::Select,
         }
     }
 
@@ -95,7 +95,7 @@ impl Database {
         Query {
             db_file_name: self.file_name.clone(),
             table_name: None,
-            delete: true,
+            operation: Operation::Delete,
         }
     }
 

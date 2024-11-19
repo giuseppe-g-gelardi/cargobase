@@ -56,30 +56,41 @@ mod tests {
         assert_eq!(columns.0[1].required, false);
     }
 
-    // #[test]
-    // fn test_columns_from_struct() {
-    //     #[derive(Serialize, Deserialize, Default)]
-    //     struct Test {
-    //         name: String,
-    //         age: i32,
-    //     }
-    //
-    //     // println!("!!!!!!!!!!!!!!!!!!!!!!!!!!");
-    //
-    //     let columns = Columns::from_struct::<Test>(true);
-    //     // println!("{:?}", columns);
-    //     // println!("{:?}", columns.0[0].name.to_string());
-    //     // println!("{:?}", columns.0[0].required);
-    //     //
-    //     // println!("{:?}", columns.0[1].name.to_string());
-    //     // println!("{:?}", columns.0[1].required);
-    //     // println!("!!!!!!!!!!!!!!!!!!!!!!!!!!");
-    //     assert_eq!(columns.0.len(), 2);
-    //     assert_eq!(columns.0[0].name.to_string(), "name".to_string());
-    //     assert_eq!(columns.0[0].required, true);
-    //     assert_eq!(columns.0[1].name.to_string(), "age".to_string());
-    //     assert_eq!(columns.0[1].required, true);
-    //
-    //     // println!("generated columns: {:#?}", columns);
-    // }
+    #[test]
+    fn test_columns_from_struct() {
+        #[derive(Serialize, Deserialize, Default)]
+        struct Test {
+            name: String,
+            age: String,
+        }
+        // the from_struct method will organize the columns in alphabetical order
+
+        let columns = Columns::from_struct::<Test>(true);
+        assert_eq!(columns.0.len(), 2);
+        assert_eq!(columns.0[0].name.to_string(), "age".to_string());
+        assert_eq!(columns.0[0].required, true);
+        assert_eq!(columns.0[1].name.to_string(), "name".to_string());
+        assert_eq!(columns.0[1].required, true);
+
+        println!("generated columns: {:#?}", columns);
+    }
+
+    #[test]
+    fn test_columns_from_struct_required_false() {
+        #[derive(Serialize, Deserialize, Default)]
+        struct Test {
+            name: String,
+            age: String,
+        }
+        // the from_struct method will organize the columns in alphabetical order
+
+        let columns = Columns::from_struct::<Test>(false);
+        assert_eq!(columns.0.len(), 2);
+        assert_eq!(columns.0[0].name.to_string(), "age".to_string());
+        assert_eq!(columns.0[0].required, false);
+        assert_eq!(columns.0[1].name.to_string(), "name".to_string());
+        assert_eq!(columns.0[1].required, false);
+
+        println!("generated columns: {:#?}", columns);
+    }
 }

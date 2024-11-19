@@ -7,14 +7,15 @@ use super::Database;
 pub struct Query {
     pub db_file_name: String,
     pub table_name: Option<String>,
-    pub delete: bool,
+    pub operation: Operation,
 }
 
-// enum Operation {
-//     Select,
-//     Delete,
-//     Mutate,
-// }
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+pub enum Operation {
+    Select,
+    Delete,
+    Mutate,
+}
 
 impl Query {
     pub fn from(mut self, table_name: &str) -> Self {
@@ -66,7 +67,8 @@ impl Query {
                                 .map_err(|e| format!("Deserialization error: {}", e))?;
 
                             // Check if the operation is "delete"
-                            if self.delete {
+                            // if self.delete {
+                            if self.operation == Operation::Delete {
                                 table.rows.remove(i);
                                 db.save_to_file()
                                     .map_err(|e| format!("Failed to save database: {}", e))?;
