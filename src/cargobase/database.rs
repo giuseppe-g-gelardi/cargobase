@@ -3,9 +3,9 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct Database {
-    pub name: String,
-    pub file_name: String,
-    pub tables: Vec<Table>,
+    pub(crate) name: String,
+    pub(crate) file_name: String,
+    pub(crate) tables: Vec<Table>,
 }
 
 impl Database {
