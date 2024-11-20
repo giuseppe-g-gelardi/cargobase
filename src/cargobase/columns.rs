@@ -106,7 +106,8 @@ mod tests {
             name: String,
             age: String,
         }
-        // the from_struct method will organize the columns in alphabetical order
+        // the from_struct method will organize the columns in a random order
+        // need to fix this
 
         let columns = Columns::from_struct::<Test>(false);
         assert_eq!(columns.0.len(), 2);
