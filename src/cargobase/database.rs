@@ -83,7 +83,7 @@ impl Database {
         Query {
             db_file_name: self.file_name.clone(),
             table_name: None,
-            operation: Operation::Add,
+            operation: Operation::Create,
             update_data: None,
             row_data: None,
         }
@@ -93,7 +93,7 @@ impl Database {
         Query {
             db_file_name: self.file_name.clone(),
             table_name: None,
-            operation: Operation::Select,
+            operation: Operation::Read,
             update_data: None,
             row_data: None,
         }
@@ -103,7 +103,7 @@ impl Database {
         Query {
             db_file_name: self.file_name.clone(),
             table_name: None,
-            operation: Operation::Select,
+            operation: Operation::Read,
             update_data: None,
             row_data: None,
         }

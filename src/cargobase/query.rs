@@ -6,11 +6,11 @@ use super::{Database, Row, Table};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Copy)]
 pub enum Operation {
-    Add, // create
-    Select, // read
-    Update, // update
-    Delete, // delete
-} // should i just change these to CRUD? lol
+    Create,
+    Read,
+    Update,
+    Delete,
+}
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct Query {
@@ -68,7 +68,7 @@ impl Query {
         let table = &mut db.tables[table_index];
 
         match self.operation {
-            Operation::Select => self.execute_select(table, key, value),
+            Operation::Read => self.execute_select(table, key, value),
             Operation::Update => {
                 let result = self.execute_update(table, key, value);
                 db.save_to_file()
@@ -81,7 +81,7 @@ impl Query {
                     .map_err(|e| format!("Failed to save database: {}", e))?;
                 result
             }
-            Operation::Add => unreachable!(),
+            Operation::Create => unreachable!(),
         }
     }
 
