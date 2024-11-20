@@ -20,10 +20,14 @@ impl Column {
 pub struct Columns(pub Vec<Column>);
 
 impl Columns {
+    // define new columns
     pub fn new(columns: Vec<Column>) -> Self {
         Columns(columns)
     }
 
+    // define columns from struct
+    // TODO: support maintaining the order of the struct fields
+    // NOTE: the order seems randomized which casuses the test to fail
     pub fn from_struct<T: Serialize + Default>(required: bool) -> Self {
         let value = json!(T::default());
         let columns = if let Value::Object(map) = value {
@@ -34,6 +38,7 @@ impl Columns {
         Columns(columns)
     }
 
+    // validate the columns
     pub fn validate(&self, row_data: Value) -> Result<(), String> {
         if let Value::Object(data) = row_data {
             for column in &self.0 {
@@ -111,5 +116,98 @@ mod tests {
         assert_eq!(columns.0[1].required, false);
 
         println!("generated columns: {:#?}", columns);
+    }
+
+    #[test]
+    fn test_validate_valid_row() {
+        let columns = Columns(vec![
+            Column::new("id", true),
+            Column::new("name", true),
+            Column::new("email", false),
+        ]);
+
+        let row_data = json!({
+            "id": "123",
+            "name": "John Doe",
+            "email": "john.doe@example.com"
+        });
+
+        let result = columns.validate(row_data);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_validate_missing_required_column() {
+        let columns = Columns(vec![
+            Column::new("id", true),
+            Column::new("name", true),
+            Column::new("email", false),
+        ]);
+
+        let row_data = json!({
+            "id": "123",
+            "email": "john.doe@example.com"
+        });
+
+        let result = columns.validate(row_data);
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Column 'name' is required.");
+    }
+
+    #[test]
+    fn test_validate_invalid_column() {
+        let columns = Columns(vec![
+            Column::new("id", true),
+            Column::new("name", true),
+            Column::new("email", false),
+        ]);
+
+        let row_data = json!({
+            "id": "123",
+            "name": "John Doe",
+            "phone": "123-456-7890" // Invalid column
+        });
+
+        let result = columns.validate(row_data);
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Column 'phone' is not valid.");
+    }
+
+    #[test]
+    fn test_validate_invalid_row_type() {
+        let columns = Columns(vec![
+            Column::new("id", true),
+            Column::new("name", true),
+            Column::new("email", false),
+        ]);
+
+        let row_data = json!([
+            {
+                "id": "123",
+                "name": "John Doe",
+                "email": "john.doe@example.com"
+            }
+        ]); // Invalid type (array instead of object)
+
+        let result = columns.validate(row_data);
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Invalid row data.");
+    }
+
+    #[test]
+    fn test_validate_optional_column_missing() {
+        let columns = Columns(vec![
+            Column::new("id", true),
+            Column::new("name", true),
+            Column::new("email", false), // Optional column
+        ]);
+
+        let row_data = json!({
+            "id": "123",
+            "name": "John Doe"
+        });
+
+        let result = columns.validate(row_data);
+        assert!(result.is_ok());
     }
 }

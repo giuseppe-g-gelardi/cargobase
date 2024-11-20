@@ -33,8 +33,12 @@ impl Database {
     pub fn add_table(&mut self, table: &mut Table) -> Result<(), String> {
         table.set_file_name(self.file_name.clone());
         if self.tables.iter().any(|t| t.name == table.name) {
-            eprintln!("Table {} already exists, Skipping creation.", table.name);
-            Ok(())
+            // eprintln!("Table {} already exists, Skipping creation.", table.name);
+            Err(format!(
+                "Table {} already exists, Skipping creation.",
+                table.name
+            ))
+            // Ok(())
         } else {
             self.tables.push(table.clone());
             Ok(())
@@ -197,6 +201,8 @@ impl Database {
 
 #[cfg(test)]
 mod tests {
+    use crate::{Column, Columns, Table};
+
     use super::*;
     use std::fs;
 
@@ -217,27 +223,81 @@ mod tests {
         }
     }
 
-    use super::super::{Column, Columns};
-    use super::Table;
+    #[test]
+    fn test_add_table_success() {
+        // if it exists, remove the test_db.json file before testing
+        std::fs::remove_file("test_db.json").ok();
+        let mut db = Database::new("test_db");
+
+        #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Default)]
+        struct TestStruct {
+            id: i32,
+            name: String,
+            email: String,
+        }
+
+        let test_columns = Columns::from_struct::<TestStruct>(true);
+        let mut test_table = Table::new("TestTable".to_string(), test_columns);
+
+        let result = db.add_table(&mut test_table);
+
+        assert!(result.is_ok());
+        assert_eq!(db.tables.len(), 1);
+        assert_eq!(db.tables[0].name, "TestTable");
+        assert_eq!(db.tables[0].file_name, Some("test_db.json".to_string()));
+
+        // remove the test_db.json file after testing
+        std::fs::remove_file("test_db.json").ok();
+    }
 
     #[test]
-    fn test_database_add_table() {
-        let test_columns = vec![
-            Column::new("id", true),
-            Column::new("name", true),
-            Column::new("email", true),
-        ];
+    fn test_add_table_already_exists() {
+        let mut db = Database::new("test_db");
 
-        let mut test_db = Database::new("test");
-        let mut test_table = Table::new("test_table".to_string(), Columns::new(test_columns));
+        // works with both methods
+        // #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Default)]
+        // struct TestStruct {
+        //     id: i32,
+        //     name: String,
+        //     email: String,
+        // }
+        //
+        // let test_columns = Columns::from_struct::<TestStruct>(true);
+        // let mut test_table = Table::new("TestTable".to_string(), test_columns);
 
-        let result = test_db.add_table(&mut test_table);
-        assert_eq!(result, Ok(()));
-        assert_eq!(test_db.tables.len(), 1);
+        // Define columns and create a table
+        let columns = Columns::new(vec![Column::new("id", true), Column::new("name", true)]);
+        let mut test_table = Table::new("TestTable".to_string(), columns);
 
-        // need to figure out a better way to handle the condition where the table already exists
-        let result = test_db.add_table(&mut test_table);
-        assert_eq!(result, Ok(()));
-        assert_eq!(test_db.tables.len(), 1);
+        // Add the table for the first time
+        let result_first_add = db.add_table(&mut test_table);
+        assert!(result_first_add.is_ok()); // First addition should succeed
+
+        // Try adding the same table again
+        let result_second_add = db.add_table(&mut test_table);
+
+        // Verify behavior when the table already exists
+        assert!(result_second_add.is_err()); // Second addition should return an error
+        assert_eq!(
+            result_second_add.unwrap_err(),
+            // spelling and grammar have to match!!
+            "Table TestTable already exists, Skipping creation."
+        );
+
+        // Verify that the database still contains only one instance of the table
+        assert_eq!(db.tables.len(), 1);
+        assert_eq!(db.tables[0].name, "TestTable");
+    }
+
+    #[test]
+    fn test_add_table_sets_file_name() {
+        let mut db = Database::new("test_db");
+        let columns = Columns(vec![Column::new("id", true), Column::new("name", true)]);
+        let mut table = Table::new("TestTable".to_string(), columns);
+
+        let _ = db.add_table(&mut table);
+
+        // Ensure the table's file_name is set correctly
+        assert_eq!(table.file_name, Some("test_db.json".to_string()));
     }
 }

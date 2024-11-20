@@ -6,10 +6,10 @@ use super::{Database, Row, Table};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Copy)]
 pub enum Operation {
-    Add,
-    Select,
-    Update,
-    Delete,
+    Add, // create
+    Select, // read
+    Update, // update
+    Delete, // delete
 } // should i just change these to CRUD? lol
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
@@ -38,7 +38,7 @@ impl Query {
     }
 
     pub fn data_from_struct<T: Serialize>(mut self, data: T) -> Self {
-        self.row_data= Some(serde_json::to_value(data).expect("Failed to serialize data"));
+        self.row_data = Some(serde_json::to_value(data).expect("Failed to serialize data"));
         self
     }
 
@@ -86,8 +86,6 @@ impl Query {
     }
 
     pub fn execute_add(self) -> Result<(), String> {
-        println!("row_data: {:?}", self.row_data);
-
         let mut db = Database::load_from_file(&self.db_file_name)
             .map_err(|e| format!("Failed to load database: {}", e))?;
 
@@ -105,7 +103,7 @@ impl Query {
 
         // Validate and add the row
         if let Some(row_data) = self.row_data {
-            table.columns.validate(row_data.clone())?; // Ensure the row matches the table schema
+            table.columns.validate(row_data.clone())?; // optional schema validation
             table.rows.push(Row::new(row_data));
 
             db.save_to_file()
