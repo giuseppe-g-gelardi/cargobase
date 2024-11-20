@@ -1,0 +1,42 @@
+{
+  "name": "cargobase-test",
+  "file_name": "cargobase-test.json",
+  "tables": [
+    {
+      "name": "Test",
+      "rows": [
+        {
+          "_id": "26fa5f08-06e8-4d07-8999-89183646466d",
+          "data": {
+            "email": "jondoe@email.com",
+            "id": "1",
+            "name": "Jon Doe"
+          }
+        },
+        {
+          "_id": "a447cb5b-783c-44ca-875e-0d99edc9bd4f",
+          "data": {
+            "email": "janedoe@email.com",
+            "id": "2",
+            "name": "Jane Doe"
+          }
+        }
+      ],
+      "columns": [
+        {
+          "name": "email",
+          "required": true
+        },
+        {
+          "name": "id",
+          "required": true
+        },
+        {
+          "name": "name",
+          "required": true
+        }
+      ],
+      "file_name": "cargobase-test.json"
+    }
+  ]
+}
