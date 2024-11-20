@@ -5,10 +5,10 @@ use super::{Columns, Database, Row};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct Table {
-    pub name: String,
+    pub(crate) name: String,
     pub rows: Vec<Row>,
     pub columns: Columns,
-    pub file_name: Option<String>, // reference to the db file_name
+    pub(crate) file_name: Option<String>, // reference to the db file_name
 }
 
 impl Table {
@@ -44,6 +44,8 @@ impl Table {
         }
     }
 
+    // TODO: Implement this method
+    //
     // fn validate_row(&self, data: &Value) -> Result<(), String> {
     //     if let Some(obj) = data.as_object() {
     //         for column in &self.columns.0 {

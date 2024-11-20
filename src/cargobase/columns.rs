@@ -3,8 +3,8 @@ use serde_json::{json, Value};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct Column {
-    pub name: String,
-    pub required: bool,
+    pub(crate) name: String,
+    pub(crate) required: bool,
 }
 
 impl Column {

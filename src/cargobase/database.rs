@@ -80,6 +80,7 @@ impl Database {
             db_file_name: self.file_name.clone(),
             table_name: None,
             operation: Operation::Select,
+            update_data: None,
         }
     }
 
@@ -88,6 +89,7 @@ impl Database {
             db_file_name: self.file_name.clone(),
             table_name: None,
             operation: Operation::Select,
+            update_data: None,
         }
     }
 
@@ -96,6 +98,16 @@ impl Database {
             db_file_name: self.file_name.clone(),
             table_name: None,
             operation: Operation::Delete,
+            update_data: None,
+        }
+    }
+
+    pub fn update_row(&self) -> Query {
+        Query {
+            db_file_name: self.file_name.clone(),
+            table_name: None,
+            operation: Operation::Update,
+            update_data: None,
         }
     }
 

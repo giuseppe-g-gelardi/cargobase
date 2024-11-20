@@ -1,20 +1,23 @@
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
-use super::Database;
+use super::{Database, Table};
+
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Copy)]
+pub enum Operation {
+    Select,
+    Update,
+    Delete,
+}
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct Query {
     pub db_file_name: String,
     pub table_name: Option<String>,
     pub operation: Operation,
-}
-
-#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
-pub enum Operation {
-    Select,
-    Delete,
-    Mutate,
+    pub update_data: Option<Value>,
+    // pub filter: Option<(String, String)>,
 }
 
 impl Query {
@@ -23,6 +26,127 @@ impl Query {
         self
     }
 
+    pub fn data(mut self, data: Value) -> Self {
+        self.update_data = Some(data);
+        self
+    }
+
+    pub fn where_eq<T: DeserializeOwned + Default>(
+        self,
+        key: &str,
+        value: &str,
+    ) -> Result<Option<T>, String> {
+        // Load the database
+        let mut db = Database::load_from_file(&self.db_file_name)
+            .map_err(|e| format!("Failed to load database: {}", e))?;
+
+        // Clone table_name to avoid moving self
+        let table_name = self
+            .table_name
+            .clone()
+            .ok_or_else(|| "Table name not specified.".to_string())?;
+
+        // Find the index of the table
+        let table_index = db
+            .tables
+            .iter()
+            .position(|t| t.name == table_name)
+            .ok_or_else(|| format!("Table '{}' not found.", table_name))?;
+
+        // Borrow the table by index
+        let table = &mut db.tables[table_index];
+
+        match self.operation {
+            Operation::Select => self.execute_select(table, key, value),
+            Operation::Update => {
+                let result = self.execute_update(table, key, value);
+                db.save_to_file()
+                    .map_err(|e| format!("Failed to save database: {}", e))?;
+                result
+            }
+            Operation::Delete => {
+                let result = self.execute_delete(table, key, value);
+                db.save_to_file()
+                    .map_err(|e| format!("Failed to save database: {}", e))?;
+                result
+            }
+        }
+    }
+
+    fn execute_select<T: DeserializeOwned>(
+        &self,
+        table: &Table,
+        key: &str,
+        value: &str,
+    ) -> Result<Option<T>, String> {
+        for row in &table.rows {
+            if let Some(field_value) = row.data.get(key) {
+                if field_value.as_str() == Some(value) {
+                    return serde_json::from_value(row.data.clone())
+                        .map(Some)
+                        .map_err(|e| format!("Deserialization error: {}", e));
+                }
+            }
+        }
+        Ok(None) // No matching record found
+    }
+
+    fn execute_update<T: DeserializeOwned>(
+        &self,
+        table: &mut Table,
+        key: &str,
+        value: &str,
+    ) -> Result<Option<T>, String> {
+        for row in &mut table.rows {
+            if let Some(field_value) = row.data.get(key) {
+                if field_value.as_str() == Some(value) {
+                    if let Some(update_data) = &self.update_data {
+                        if let Value::Object(update_map) = update_data {
+                            if let Value::Object(row_map) = &mut row.data {
+                                for (k, v) in update_map {
+                                    row_map.insert(k.clone(), v.clone());
+                                }
+                            } else {
+                                return Err("Row data is not a JSON object.".to_string());
+                            }
+
+                            println!("Record updated successfully.");
+                            return serde_json::from_value(row.data.clone())
+                                .map(Some)
+                                .map_err(|e| format!("Deserialization error: {}", e));
+                        } else {
+                            return Err("Invalid update data format.".to_string());
+                        }
+                    } else {
+                        return Err("No update data provided.".to_string());
+                    }
+                }
+            }
+        }
+
+        Ok(None) // No matching record found
+    }
+    fn execute_delete<T: DeserializeOwned>(
+        &self,
+        table: &mut Table,
+        key: &str,
+        value: &str,
+    ) -> Result<Option<T>, String> {
+        for (i, row) in table.rows.iter().enumerate() {
+            if let Some(field_value) = row.data.get(key) {
+                if field_value.as_str() == Some(value) {
+                    let record = serde_json::from_value(row.data.clone())
+                        .map_err(|e| format!("Deserialization error: {}", e))?;
+
+                    table.rows.remove(i);
+                    println!("Record deleted successfully.");
+                    return Ok(Some(record));
+                }
+            }
+        }
+
+        Ok(None) // No matching record found
+    }
     pub fn all<T: DeserializeOwned>(&self) -> Vec<T> {
         let db = Database::load_from_file(&self.db_file_name).unwrap_or_else(|e| {
             eprintln!("Failed to load database from file: {}", e);
@@ -50,45 +174,8 @@ impl Query {
         }
     }
 
-    /// Fetch or delete a single row by a specific key-value pair
-    pub fn where_eq<T: DeserializeOwned>(self, key: &str, value: &str) -> Result<T, String> {
-        // Load the latest state of the database from the file
-        let mut db = Database::load_from_file(&self.db_file_name)
-            .map_err(|e| format!("Failed to load database from file: {}", e))?;
-
-        if let Some(table_name) = &self.table_name {
-            if let Some(table) = db.tables.iter_mut().find(|t| t.name.as_str() == table_name) {
-                for i in 0..table.rows.len() {
-                    let row = &table.rows[i];
-                    if let Some(field_value) = row.data.get(key) {
-                        if field_value.as_str() == Some(value) {
-                            // Deserialize the matching record
-                            let record: T = serde_json::from_value(row.data.clone())
-                                .map_err(|e| format!("Deserialization error: {}", e))?;
-
-                            // Check if the operation is "delete"
-                            // if self.delete {
-                            if self.operation == Operation::Delete {
-                                table.rows.remove(i);
-                                db.save_to_file()
-                                    .map_err(|e| format!("Failed to save database: {}", e))?;
-                                println!("Deleted record from table '{}'.", table_name);
-                            }
-
-                            // Return the found or deleted record
-                            return Ok(record);
-                        }
-                    }
-                }
-                Err(format!(
-                    "No matching record found where '{}' == '{}'.",
-                    key, value
-                ))
-            } else {
-                Err(format!("Table '{}' not found.", table_name))
-            }
-        } else {
-            Err("Table name not specified.".to_string())
-        }
+    pub fn set(mut self, update_data: Value) -> Self {
+        self.update_data = Some(update_data);
+        self
     }
 }
