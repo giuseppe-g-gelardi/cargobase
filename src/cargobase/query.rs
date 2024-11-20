@@ -2,14 +2,15 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use super::{Database, Table};
+use super::{Database, Row, Table};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Copy)]
 pub enum Operation {
+    Add,
     Select,
     Update,
     Delete,
-}
+} // should i just change these to CRUD? lol
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct Query {
@@ -17,7 +18,7 @@ pub struct Query {
     pub table_name: Option<String>,
     pub operation: Operation,
     pub update_data: Option<Value>,
-    // pub filter: Option<(String, String)>,
+    pub row_data: Option<Value>,
 }
 
 impl Query {
@@ -26,8 +27,18 @@ impl Query {
         self
     }
 
+    pub fn to(mut self, table_name: &str) -> Self {
+        self.table_name = Some(table_name.to_string());
+        self
+    }
+
     pub fn data(mut self, data: Value) -> Self {
         self.update_data = Some(data);
+        self
+    }
+
+    pub fn data_from_struct<T: Serialize>(mut self, data: T) -> Self {
+        self.row_data= Some(serde_json::to_value(data).expect("Failed to serialize data"));
         self
     }
 
@@ -70,6 +81,39 @@ impl Query {
                     .map_err(|e| format!("Failed to save database: {}", e))?;
                 result
             }
+            Operation::Add => unreachable!(),
+        }
+    }
+
+    pub fn execute_add(self) -> Result<(), String> {
+        println!("row_data: {:?}", self.row_data);
+
+        let mut db = Database::load_from_file(&self.db_file_name)
+            .map_err(|e| format!("Failed to load database: {}", e))?;
+
+        let table_name = self
+            .table_name
+            .clone()
+            .ok_or_else(|| "Table name not specified.".to_string())?;
+
+        // Find the table
+        let table = db
+            .tables
+            .iter_mut()
+            .find(|t| t.name == table_name)
+            .ok_or_else(|| format!("Table '{}' not found.", table_name))?;
+
+        // Validate and add the row
+        if let Some(row_data) = self.row_data {
+            table.columns.validate(row_data.clone())?; // Ensure the row matches the table schema
+            table.rows.push(Row::new(row_data));
+
+            db.save_to_file()
+                .map_err(|e| format!("Failed to save database: {}", e))?;
+            println!("Row added successfully to '{}'.", table_name);
+            Ok(())
+        } else {
+            Err("No data provided for the new row.".to_string())
         }
     }
 

@@ -24,3 +24,5 @@ cargobase.json
 test.json
 
 src/main.rs
+
+.env

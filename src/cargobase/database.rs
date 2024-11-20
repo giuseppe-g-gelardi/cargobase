@@ -1,4 +1,4 @@
-use super::{Query, query::Operation, Table};
+use super::{query::Operation, Query, Table};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
@@ -75,12 +75,23 @@ impl Database {
         self.tables.iter_mut().find(|t| t.name == table_name)
     }
 
+    pub fn add_row(&mut self) -> Query {
+        Query {
+            db_file_name: self.file_name.clone(),
+            table_name: None,
+            operation: Operation::Add,
+            update_data: None,
+            row_data: None,
+        }
+    }
+
     pub fn get_rows(&self) -> Query {
         Query {
             db_file_name: self.file_name.clone(),
             table_name: None,
             operation: Operation::Select,
             update_data: None,
+            row_data: None,
         }
     }
 
@@ -90,6 +101,7 @@ impl Database {
             table_name: None,
             operation: Operation::Select,
             update_data: None,
+            row_data: None,
         }
     }
 
@@ -99,6 +111,7 @@ impl Database {
             table_name: None,
             operation: Operation::Delete,
             update_data: None,
+            row_data: None,
         }
     }
 
@@ -108,6 +121,7 @@ impl Database {
             table_name: None,
             operation: Operation::Update,
             update_data: None,
+            row_data: None,
         }
     }
 

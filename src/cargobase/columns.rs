@@ -33,6 +33,25 @@ impl Columns {
         };
         Columns(columns)
     }
+
+    pub fn validate(&self, row_data: Value) -> Result<(), String> {
+        if let Value::Object(data) = row_data {
+            for column in &self.0 {
+                if column.required && !data.contains_key(&column.name) {
+                    return Err(format!("Column '{}' is required.", column.name));
+                }
+            }
+
+            for key in data.keys() {
+                if !self.0.iter().any(|col| col.name == *key) {
+                    return Err(format!("Column '{}' is not valid.", key));
+                }
+            }
+            Ok(())
+        } else {
+            Err("Invalid row data.".to_string())
+        }
+    }
 }
 
 #[cfg(test)]
