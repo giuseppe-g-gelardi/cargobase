@@ -1,0 +1,21 @@
+{
+  "name": "test_db",
+  "file_name": "test_db.json",
+  "tables": [
+    {
+      "name": "TestTable",
+      "rows": [],
+      "columns": [
+        {
+          "name": "id",
+          "required": true
+        },
+        {
+          "name": "name",
+          "required": true
+        }
+      ],
+      "file_name": "test_db.json"
+    }
+  ]
+}

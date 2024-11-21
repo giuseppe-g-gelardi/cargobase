@@ -227,7 +227,7 @@ mod tests {
     use super::*;
     use serde_json::json;
 
-    use crate::{Column, Columns};
+    use crate::Columns;
 
     #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
     struct TestData {
@@ -236,6 +236,8 @@ mod tests {
     }
 
     fn setup_test_db() -> Database {
+        // Cleanup the test database file for each test
+        std::fs::remove_file("test_db.json").ok();
         let mut db = Database::new("test_db");
         // let columns = Columns(vec![Column::new("id", true), Column::new("name", true)]);
 
@@ -407,13 +409,11 @@ mod tests {
     fn test_query_all() {
         std::fs::remove_file("test_db.json").ok();
 
-        // let mut db = setup_test_db();
-        let mut db = Database::new("test_db");
-        let test_columns = Columns::from_struct::<TestData>(true);
-        let mut test_table = Table::new("TestTable".to_string(), test_columns);
-        let _ = db.add_table(&mut test_table);
-
-        // println!("Database initialized: {:?}", db);
+        // let mut db = Database::new("test_db");
+        // let test_columns = Columns::from_struct::<TestData>(true);
+        // let mut test_table = Table::new("TestTable".to_string(), test_columns);
+        // let _ = db.add_table(&mut test_table);
+        let mut db = setup_test_db();
 
         let test_data1 = TestData {
             id: "1".to_string(),
@@ -424,32 +424,21 @@ mod tests {
             name: "Bob".to_string(),
         };
 
-        db.add_row().to("TestTable").data_from_struct(test_data1.clone()).execute_add().expect("Failed to add row 1");
-        println!("Database initialized: {:?}", db);
+        db.add_row()
+            .to("TestTable")
+            .data_from_struct(test_data1.clone())
+            .execute_add()
+            .expect("Failed to add row 1");
+        db.add_row()
+            .to("TestTable")
+            .data_from_struct(test_data2.clone())
+            .execute_add()
+            .expect("Failed to add row 2");
 
-        // let rows: Vec<TestData> = db.get_rows().from("TestTable").all();
-        // println!("All rows: {:?}", rows);
+        let rows: Vec<TestData> = db.get_rows().from("TestTable").all();
 
-        std::fs::remove_file("test_db.json").ok();
-
-        // db.add_row()
-        //     .to("TestTable")
-        //     .data_from_struct(test_data1.clone())
-        //     .execute_add()
-        //     .expect("Failed to add row 1");
-        //
-        // db.add_row()
-        //     .to("TestTable")
-        //     .data_from_struct(test_data2.clone())
-        //     .execute_add()
-        //     .expect("Failed to add row 2");
-
-        // let rows: Vec<TestData> = db.get_rows().from("TestTable").all();
-        //
-        // println!("All rows: {:?}", rows);
-
-        // assert_eq!(rows.len(), 2);
-        // assert!(rows.contains(&test_data1));
-        // assert!(rows.contains(&test_data2));
+        assert_eq!(rows.len(), 2);
+        assert!(rows.contains(&test_data1));
+        assert!(rows.contains(&test_data2));
     }
 }
