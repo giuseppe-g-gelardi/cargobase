@@ -233,7 +233,7 @@ mod tests {
         let db = setup_test_db();
         assert_eq!(db.name, "test_db");
         assert_eq!(db.file_name, "test_db.json");
-        assert_eq!(db.tables.len(), 0);
+        assert_eq!(db.tables.len(), 1); // the setup_test_db function adds a table
         std::fs::remove_file("test_db.json").ok();
     }
 
