@@ -5,10 +5,10 @@ use super::{Columns, Database, Row};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct Table {
-    pub name: String,
+    pub(crate) name: String,
     pub rows: Vec<Row>,
     pub columns: Columns,
-    pub file_name: Option<String>, // reference to the db file_name
+    pub(crate) file_name: Option<String>, // reference to the db file_name
 }
 
 impl Table {
@@ -21,7 +21,7 @@ impl Table {
         }
     }
 
-    pub fn set_file_name(&mut self, file_name: String) {
+    pub(crate) fn set_file_name(&mut self, file_name: String) {
         self.file_name = Some(file_name);
     }
 
@@ -44,27 +44,50 @@ impl Table {
         }
     }
 
-    fn validate_row(&self, data: &Value) -> Result<(), String> {
-        if let Some(obj) = data.as_object() {
-            for column in &self.columns.0 {
-                if column.required && !obj.contains_key(&column.name) {
-                    return Err(format!("Missing required column: {}", column.name));
-                }
-            }
+    // TODO: Implement this method
+    //
+    // fn validate_row(&self, data: &Value) -> Result<(), String> {
+    //     if let Some(obj) = data.as_object() {
+    //         for column in &self.columns.0 {
+    //             if column.required && !obj.contains_key(&column.name) {
+    //                 return Err(format!("Missing required column: {}", column.name));
+    //             }
+    //         }
+    //
+    //         for key in obj.keys() {
+    //             if !self.columns.0.iter().any(|col| col.name == *key) {
+    //                 return Err(format!("Invalid column name: {}", key));
+    //             }
+    //         }
+    //         Ok(())
+    //     } else {
+    //         Err("Invalid data format: expected a JSON object.".to_string())
+    //     }
+    // }
+}
 
-            for key in obj.keys() {
-                if !self.columns.0.iter().any(|col| col.name == *key) {
-                    return Err(format!("Invalid column name: {}", key));
-                }
-            }
-            Ok(())
-        } else {
-            Err("Invalid data format: expected a JSON object.".to_string())
-        }
+#[cfg(test)]
+mod tests {
+    use super::super::Column;
+    use super::*;
+
+    #[test]
+    fn test_table_new() {
+        let columns = Columns::new(vec![Column::new("name", true), Column::new("age", false)]);
+        let table = Table::new("users".to_string(), columns.clone());
+        assert_eq!(table.name, "users");
+        assert_eq!(table.columns, columns);
+    }
+
+    #[test]
+    fn test_table_set_file_name() {
+        let columns = Columns::new(vec![Column::new("name", true), Column::new("age", false)]);
+        let mut table = Table::new("users".to_string(), columns.clone());
+        table.set_file_name("db.json".to_string());
+        assert_eq!(table.file_name, Some("db.json".to_string()));
     }
 }
 
-// impl Table {
 //     /// Add a new column to the table schema and update existing rows
 //     pub fn add_column(&mut self, column: Column, db: &mut Database) -> Result<(), String> {
 //         // Check if the column already exists
@@ -90,5 +113,4 @@ impl Table {
 //
 //         Ok(())
 //     }
-// }
 //

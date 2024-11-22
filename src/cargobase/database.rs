@@ -1,11 +1,11 @@
-use super::{Query, Table};
+use super::{query::Operation, Query, Table};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct Database {
-    pub name: String,
-    pub file_name: String,
-    pub tables: Vec<Table>,
+    pub(crate) name: String,
+    pub(crate) file_name: String,
+    pub(crate) tables: Vec<Table>,
 }
 
 impl Database {
@@ -33,14 +33,16 @@ impl Database {
     pub fn add_table(&mut self, table: &mut Table) -> Result<(), String> {
         table.set_file_name(self.file_name.clone());
         if self.tables.iter().any(|t| t.name == table.name) {
-            Err(format!(
-                "Table {} already exists, Skipping creation.",
-                table.name
-            ))
-        } else {
-            self.tables.push(table.clone());
-            Ok(())
+            println!("Table {} already exists, Skipping creation.", table.name);
+            return Ok(());
         }
+
+        self.tables.push(table.clone());
+        self.save_to_file()
+            .map_err(|e| format!("Failed to save database: {:?}", e))?;
+        println!("Table {} added successfully", table.name);
+
+        Ok(())
     }
 
     pub fn drop_table(&mut self, table_name: &str) -> Result<(), String> {
@@ -60,28 +62,40 @@ impl Database {
         }
     }
 
-    pub fn save_to_file(&self) -> Result<(), std::io::Error> {
+    pub(crate) fn save_to_file(&self) -> Result<(), std::io::Error> {
         let json_data = serde_json::to_string_pretty(&self)?;
         std::fs::write(&self.file_name, json_data)?;
         println!("Database saved to file: {}", self.file_name);
         Ok(())
     }
 
-    pub fn load_from_file(file_name: &str) -> Result<Self, std::io::Error> {
+    pub(crate) fn load_from_file(file_name: &str) -> Result<Self, std::io::Error> {
         let json_data = std::fs::read_to_string(file_name)?;
         let db: Database = serde_json::from_str(&json_data)?;
         Ok(db)
     }
 
-    pub fn get_table_mut(&mut self, table_name: &str) -> Option<&mut Table> {
+    pub(crate) fn get_table_mut(&mut self, table_name: &str) -> Option<&mut Table> {
         self.tables.iter_mut().find(|t| t.name == table_name)
+    }
+
+    pub fn add_row(&mut self) -> Query {
+        Query {
+            db_file_name: self.file_name.clone(),
+            table_name: None,
+            operation: Operation::Create,
+            update_data: None,
+            row_data: None,
+        }
     }
 
     pub fn get_rows(&self) -> Query {
         Query {
             db_file_name: self.file_name.clone(),
             table_name: None,
-            delete: false,
+            operation: Operation::Read,
+            update_data: None,
+            row_data: None,
         }
     }
 
@@ -89,7 +103,9 @@ impl Database {
         Query {
             db_file_name: self.file_name.clone(),
             table_name: None,
-            delete: false,
+            operation: Operation::Read,
+            update_data: None,
+            row_data: None,
         }
     }
 
@@ -97,7 +113,19 @@ impl Database {
         Query {
             db_file_name: self.file_name.clone(),
             table_name: None,
-            delete: true,
+            operation: Operation::Delete,
+            update_data: None,
+            row_data: None,
+        }
+    }
+
+    pub fn update_row(&self) -> Query {
+        Query {
+            db_file_name: self.file_name.clone(),
+            table_name: None,
+            operation: Operation::Update,
+            update_data: None,
+            row_data: None,
         }
     }
 
@@ -168,5 +196,94 @@ impl Database {
                 println!("{}", row_data.join(" | "));
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{Column, Columns, Table};
+
+    use super::*;
+    use serde_json::json;
+    use std::fs;
+
+    #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+    struct TestData {
+        id: String,
+        name: String,
+    }
+
+    fn setup_test_db() -> Database {
+        // Cleanup the test database file for each test
+        std::fs::remove_file("test_db.json").ok();
+        let mut db = Database::new("test_db");
+
+        let test_columns = Columns::from_struct::<TestData>(true);
+
+        let mut table = Table::new("TestTable".to_string(), test_columns);
+        db.add_table(&mut table).unwrap();
+
+        db
+    }
+
+    #[test]
+    fn test_database_new() {
+
+        std::fs::remove_file("test_db.json").ok();
+        let db = setup_test_db();
+        assert_eq!(db.name, "test_db");
+        assert_eq!(db.file_name, "test_db.json");
+        assert_eq!(db.tables.len(), 1); // the setup_test_db function adds a table
+        std::fs::remove_file("test_db.json").ok();
+    }
+
+    #[test]
+    fn test_add_table_success() {
+        std::fs::remove_file("test_db.json").ok();
+        let mut db = Database::new("test_db");
+        let test_columns = Columns::from_struct::<TestData>(true);
+        let mut test_table = Table::new("TestTable".to_string(), test_columns);
+
+        let result = db.add_table(&mut test_table);
+
+        assert!(result.is_ok());
+        assert_eq!(db.tables.len(), 1);
+        assert_eq!(db.tables[0].name, "TestTable");
+        assert_eq!(db.tables[0].file_name, Some("test_db.json".to_string()));
+
+        // remove the test_db.json file after testing
+        std::fs::remove_file("test_db.json").ok();
+    }
+
+    #[test]
+    fn test_add_table_already_exists() {
+        std::fs::remove_file("test_db.json").ok();
+        let mut db = setup_test_db();
+
+        let columns = Columns::from_struct::<TestData>(true);
+        let mut test_table = Table::new("TestTable".to_string(), columns);
+
+        // Add the table for the first time
+        let result_first_add = db.add_table(&mut test_table);
+        assert!(result_first_add.is_ok()); // First addition should succeed
+
+        // Try adding the same table again
+        let result_second_add = db.add_table(&mut test_table);
+
+        // Verify behavior when the table already exists
+        assert!(result_second_add.is_ok()); // Second addition should succeed
+        assert_eq!(
+            result_second_add,
+            // spelling and grammar have to match!!
+            // "Table TestTable already exists, Skipping creation.",
+            Ok(())
+        );
+
+        // Verify that the database still contains only one instance of the table
+        assert_eq!(db.tables.len(), 1);
+        assert_eq!(db.tables[0].name, "TestTable");
+
+        // remove the test_db.json file after testing
+        std::fs::remove_file("test_db.json").ok();
     }
 }
