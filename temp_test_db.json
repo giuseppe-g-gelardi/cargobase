@@ -1,0 +1,36 @@
+{
+  "name": "temp_test_db",
+  "file_name": "temp_test_db.json",
+  "tables": [
+    {
+      "name": "TestTable",
+      "rows": [
+        {
+          "_id": "d956dde5-1fd5-4f6a-bc7e-acc2373a6587",
+          "data": {
+            "id": "1",
+            "name": "Alice"
+          }
+        },
+        {
+          "_id": "c585d2b7-a029-4efe-8587-601306e52f90",
+          "data": {
+            "id": "2",
+            "name": "Bob"
+          }
+        }
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "required": true
+        },
+        {
+          "name": "name",
+          "required": true
+        }
+      ],
+      "file_name": "temp_test_db.json"
+    }
+  ]
+}

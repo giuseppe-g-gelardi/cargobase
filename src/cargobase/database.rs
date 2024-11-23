@@ -11,13 +11,13 @@ pub struct Database {
 impl Database {
     pub fn new(name: &str) -> Self {
         let name = name.to_string();
-        let file_name = format!("{}.json", name);
+        let file_name = format!("{name}.json");
 
         if std::path::Path::new(&file_name).exists() {
-            return Database::load_from_file(&file_name).unwrap();
+            println!("Database already exists: {}", file_name);
         } else {
             println!("Creating new database: {}", file_name);
-
+            // Create an empty JSON file for the new database
             if let Err(e) = std::fs::write(&file_name, "{}") {
                 eprintln!("Failed to create database file: {}", e);
             }
@@ -65,7 +65,8 @@ impl Database {
     pub(crate) fn save_to_file(&self) -> Result<(), std::io::Error> {
         let json_data = serde_json::to_string_pretty(&self)?;
         std::fs::write(&self.file_name, json_data)?;
-        println!("Database saved to file: {}", self.file_name);
+        // println!("Database saved to file: {}", self.file_name);
+        log::info!("Database saved to file: {}", self.file_name);
         Ok(())
     }
 
@@ -201,11 +202,9 @@ impl Database {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Column, Columns, Table};
+    use crate::{Columns, Table};
 
     use super::*;
-    use serde_json::json;
-    use std::fs;
 
     #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
     struct TestData {
@@ -228,7 +227,6 @@ mod tests {
 
     #[test]
     fn test_database_new() {
-
         std::fs::remove_file("test_db.json").ok();
         let db = setup_test_db();
         assert_eq!(db.name, "test_db");

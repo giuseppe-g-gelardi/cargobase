@@ -226,6 +226,7 @@ impl Query {
 mod tests {
     use super::*;
     use serde_json::json;
+    use tempfile::NamedTempFile;
 
     use crate::Columns;
 
@@ -235,16 +236,32 @@ mod tests {
         name: String,
     }
 
-    fn setup_test_db() -> Database {
-        // Cleanup the test database file for each test
-        std::fs::remove_file("test_db.json").ok();
-        let mut db = Database::new("test_db");
+    // fn setup_test_db() -> Database {
+    //     // Cleanup the test database file for each test
+    //     std::fs::remove_file("test_db.json").ok();
+    //     let mut db = Database::new("test_db");
+    //     let test_columns = Columns::from_struct::<TestData>(true);
+    //
+    //     let mut table = Table::new("TestTable".to_string(), test_columns);
+    //     db.add_table(&mut table).unwrap();
+    //
+    //     db
+    // }
+
+    fn setup_temp_db() -> (Database, NamedTempFile) {
+        // Create a temporary file
+        let temp_file = NamedTempFile::new().expect("Failed to create a temporary file");
+        let db_path = temp_file.path().to_str().unwrap().to_string();
+
+        // Initialize the test database
+        let mut db = Database::new(&db_path);
         let test_columns = Columns::from_struct::<TestData>(true);
 
         let mut table = Table::new("TestTable".to_string(), test_columns);
         db.add_table(&mut table).unwrap();
 
-        db
+        // Return the database and the temporary file
+        (db, temp_file)
     }
 
     #[test]
@@ -319,12 +336,48 @@ mod tests {
         std::fs::remove_file("test_db.json").ok();
     }
 
+    // #[test]
+    // fn test_query_all() {
+    //     println!("test query all");
+    //     std::fs::remove_file("test_db.json").ok();
+    //     let mut db = setup_test_db();
+    //     println!("1 db: {:?}", &db);
+    //
+    //     let test_data1 = TestData {
+    //         id: "1".to_string(),
+    //         name: "Alice".to_string(),
+    //     };
+    //     let test_data2 = TestData {
+    //         id: "2".to_string(),
+    //         name: "Bob".to_string(),
+    //     };
+    //
+    //     println!("2 db: {:?}", &db);
+    //
+    //     db.add_row()
+    //         .to("TestTable")
+    //         .data_from_struct(test_data1.clone())
+    //         .execute_add()
+    //         .expect("Failed to add row 1");
+    //     db.add_row()
+    //         .to("TestTable")
+    //         .data_from_struct(test_data2.clone())
+    //         .execute_add()
+    //         .expect("Failed to add row 2");
+    //
+    //     println!("3 db: {:?}", &db);
+    //
+    //     let rows: Vec<TestData> = db.get_rows().from("TestTable").all();
+    //
+    //     assert_eq!(rows.len(), 2);
+    //     assert!(rows.contains(&test_data1));
+    //     assert!(rows.contains(&test_data2));
+    //     std::fs::remove_file("test_db.json").ok();
+    // }
+
     #[test]
     fn test_query_all() {
-        println!("test query all");
-        std::fs::remove_file("test_db.json").ok();
-        let mut db = setup_test_db();
-        println!("1 db: {:?}", &db);
+        let (mut db, _) = setup_temp_db();
 
         let test_data1 = TestData {
             id: "1".to_string(),
@@ -335,27 +388,25 @@ mod tests {
             name: "Bob".to_string(),
         };
 
-        println!("2 db: {:?}", &db);
-
         db.add_row()
             .to("TestTable")
             .data_from_struct(test_data1.clone())
             .execute_add()
             .expect("Failed to add row 1");
+
         db.add_row()
             .to("TestTable")
             .data_from_struct(test_data2.clone())
             .execute_add()
             .expect("Failed to add row 2");
 
-        println!("3 db: {:?}", &db);
-
         let rows: Vec<TestData> = db.get_rows().from("TestTable").all();
 
         assert_eq!(rows.len(), 2);
         assert!(rows.contains(&test_data1));
         assert!(rows.contains(&test_data2));
-        std::fs::remove_file("test_db.json").ok();
+
+        // No explicit cleanup needed; tempfile will handle it automatically
     }
 }
 
