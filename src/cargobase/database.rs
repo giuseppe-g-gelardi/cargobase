@@ -14,12 +14,12 @@ impl Database {
         let file_name = format!("{name}.json");
 
         if std::path::Path::new(&file_name).exists() {
-            println!("Database already exists: {}", file_name);
+            println!("Database already exists: {file_name}");
         } else {
-            println!("Creating new database: {}", file_name);
+            println!("Creating new database: {file_name}");
             // Create an empty JSON file for the new database
             if let Err(e) = std::fs::write(&file_name, "{}") {
-                eprintln!("Failed to create database file: {}", e);
+                eprintln!("Failed to create database file: {e}");
             }
         }
 
