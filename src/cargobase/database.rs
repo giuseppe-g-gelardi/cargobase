@@ -202,6 +202,7 @@ impl Database {
 
 #[cfg(test)]
 mod tests {
+    use crate::cargobase::setup_temp_db;
     use crate::{Columns, Table};
 
     use super::*;
@@ -212,27 +213,16 @@ mod tests {
         name: String,
     }
 
-    fn setup_test_db() -> Database {
-        // Cleanup the test database file for each test
-        std::fs::remove_file("test_db.json").ok();
-        let mut db = Database::new("test_db");
-
-        let test_columns = Columns::from_struct::<TestData>(true);
-
-        let mut table = Table::new("TestTable".to_string(), test_columns);
-        db.add_table(&mut table).unwrap();
-
-        db
-    }
-
     #[test]
     fn test_database_new() {
-        std::fs::remove_file("test_db.json").ok();
-        let db = setup_test_db();
-        assert_eq!(db.name, "test_db");
-        assert_eq!(db.file_name, "test_db.json");
-        assert_eq!(db.tables.len(), 1); // the setup_test_db function adds a table
-        std::fs::remove_file("test_db.json").ok();
+        let (db, _) = setup_temp_db();
+
+        let db_name = &db.name.to_string();
+        let fnn = format!("{db_name}.json");
+
+        assert_eq!(db.name, db_name.to_string());
+        assert_eq!(db.file_name, fnn);
+        assert_eq!(db.tables.len(), 1); // the setup_temp_db function adds a table
     }
 
     #[test]
@@ -256,7 +246,8 @@ mod tests {
     #[test]
     fn test_add_table_already_exists() {
         std::fs::remove_file("test_db.json").ok();
-        let mut db = setup_test_db();
+        // let mut db = setup_test_db();
+        let (mut db, _) = setup_temp_db();
 
         let columns = Columns::from_struct::<TestData>(true);
         let mut test_table = Table::new("TestTable".to_string(), columns);

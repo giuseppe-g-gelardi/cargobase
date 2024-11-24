@@ -226,30 +226,15 @@ impl Query {
 mod tests {
     use super::*;
     use serde_json::json;
-    use tempfile::NamedTempFile;
+    // use tempfile::NamedTempFile;
 
-    use crate::Columns;
+    use crate::cargobase::setup_temp_db;
+    // use crate::Columns;
 
     #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
     struct TestData {
         id: String,
         name: String,
-    }
-
-    fn setup_temp_db() -> (Database, NamedTempFile) {
-        // Create a temporary file
-        let temp_file = NamedTempFile::new().expect("Failed to create a temporary file");
-        let db_path = temp_file.path().to_str().unwrap().to_string();
-
-        // Initialize the test database
-        let mut db = Database::new(&db_path);
-        let test_columns = Columns::from_struct::<TestData>(true);
-
-        let mut table = Table::new("TestTable".to_string(), test_columns);
-        db.add_table(&mut table).unwrap();
-
-        // Return the database and the temporary file
-        (db, temp_file)
     }
 
     #[test]
