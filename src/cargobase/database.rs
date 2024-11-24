@@ -52,7 +52,8 @@ impl Database {
         //     .map_err(|e| format!("Failed to save database: {:?}", e))?;
         // println!("Table {} added successfully", table.name);
 
-        self.save_to_file().map_err(|e| DatabaseError::SaveError(e))?;
+        self.save_to_file()
+            .map_err(|e| DatabaseError::SaveError(e))?;
         Ok(())
     }
 
@@ -258,34 +259,20 @@ mod tests {
 
     #[test]
     fn test_add_table_already_exists() {
-        std::fs::remove_file("test_db.json").ok();
         let mut db = setup_temp_db();
 
         let columns = Columns::from_struct::<TestData>(true);
-        let mut test_table = Table::new("TestTable".to_string(), columns);
+        let mut duplicate_table = Table::new("TestTable".to_string(), columns);
+        let result = db.add_table(&mut duplicate_table);
 
-        // Add the table for the first time
-        let result_first_add = db.add_table(&mut test_table);
-        assert!(result_first_add.is_ok()); // First addition should succeed
+        // Assert that an error is returned
+        assert!(matches!(result, Err(DatabaseError::TableAlreadyExists(_))));
 
-        // Try adding the same table again
-        let result_second_add = db.add_table(&mut test_table);
+        if let Err(DatabaseError::TableAlreadyExists(name)) = result {
+            assert_eq!(name, "TestTable");
+        }
 
-        // Verify behavior when the table already exists
-        assert!(result_second_add.is_ok()); // Second addition should succeed
-        // assert_eq!(
-        //     result_second_add,
-        //     // spelling and grammar have to match!!
-        //     // "Table TestTable already exists, Skipping creation.",
-        //     Ok(())
-        // );
-        
-
-        // Verify that the database still contains only one instance of the table
+        // Ensure no duplicate tables exist
         assert_eq!(db.tables.len(), 1);
-        assert_eq!(db.tables[0].name, "TestTable");
-
-        // remove the test_db.json file after testing
-        std::fs::remove_file("test_db.json").ok();
     }
 }
