@@ -9,7 +9,8 @@ struct TestData {
     name: String,
 }
 
-pub fn setup_temp_db() -> (Database, NamedTempFile) {
+// pub fn setup_temp_db() -> (Database, NamedTempFile) {
+pub fn setup_temp_db() -> Database {
     // Create a temporary file
     let temp_file = NamedTempFile::new().expect("Failed to create a temporary file");
     let db_path = temp_file.path().to_str().unwrap().to_string();
@@ -22,5 +23,6 @@ pub fn setup_temp_db() -> (Database, NamedTempFile) {
     db.add_table(&mut table).unwrap();
 
     // Return the database and the temporary file
-    (db, temp_file) // should i just return the db? hmm...
+    // (db, temp_file) // should i just return the db? hmm...
+    db
 }

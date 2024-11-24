@@ -1,5 +1,7 @@
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use serde_reflection::{ContainerFormat, Named, Tracer, TracerConfig};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct Column {
@@ -25,9 +27,6 @@ impl Columns {
         Columns(columns)
     }
 
-    // define columns from struct
-    // TODO: support maintaining the order of the struct fields
-    // NOTE: the order seems randomized which casuses the test to fail
     pub fn from_struct<T: Serialize + Default>(required: bool) -> Self {
         let value = json!(T::default());
         let columns = if let Value::Object(map) = value {
@@ -35,6 +34,33 @@ impl Columns {
         } else {
             vec![]
         };
+        Columns(columns)
+    }
+
+    pub fn from_struct_ordered<T: Serialize + DeserializeOwned + Default>(required: bool) -> Self {
+        // Initialize the reflection tracer
+        let mut tracer = Tracer::new(TracerConfig::default());
+        tracer
+            .trace_simple_type::<T>()
+            .expect("Failed to trace struct");
+
+        // Retrieve the container format for the struct
+        let registry = tracer.registry().expect("Failed to get registry");
+        let type_name = std::any::type_name::<T>().split("::").last().unwrap();
+        let container = registry
+            .get(type_name)
+            .expect("Struct not found in registry");
+
+        // Extract fields in declared order
+        let columns = if let ContainerFormat::Struct(fields) = container {
+            fields
+                .iter()
+                .map(|Named { name, .. }| Column::new(name, required))
+                .collect()
+        } else {
+            vec![]
+        };
+
         Columns(columns)
     }
 
@@ -210,5 +236,28 @@ mod tests {
 
         let result = columns.validate(row_data);
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_columns_from_struct_ordered() {
+        #[derive(Serialize, Deserialize, Default)]
+        struct TestData {
+            id: String,
+            first_name: String,
+            last_name: String,
+            email: String,
+            age: u8,
+            bio: String,
+            location: String,
+        }
+        let columns = Columns::from_struct_ordered::<TestData>(true);
+        assert_eq!(columns.0.len(), 7);
+        assert_eq!(columns.0[0].name.to_string(), "id".to_string());
+        assert_eq!(columns.0[1].name.to_string(), "first_name".to_string());
+        assert_eq!(columns.0[2].name.to_string(), "last_name".to_string());
+        assert_eq!(columns.0[3].name.to_string(), "email".to_string());
+        assert_eq!(columns.0[4].name.to_string(), "age".to_string());
+        assert_eq!(columns.0[5].name.to_string(), "bio".to_string());
+        assert_eq!(columns.0[6].name.to_string(), "location".to_string());
     }
 }

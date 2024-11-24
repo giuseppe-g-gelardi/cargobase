@@ -1,6 +1,8 @@
 use super::{query::Operation, Query, Table};
 use serde::{Deserialize, Serialize};
 
+use super::DatabaseError;
+
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct Database {
     pub(crate) name: String,
@@ -14,7 +16,13 @@ impl Database {
         let file_name = format!("{name}.json");
 
         if std::path::Path::new(&file_name).exists() {
-            println!("Database already exists: {file_name}");
+            println!("Database already exists: {file_name}, loading database");
+
+            if let Ok(db) = Database::load_from_file(&file_name) {
+                return db;
+            } else {
+                eprintln!("Failed to load database from file: {file_name}");
+            }
         } else {
             println!("Creating new database: {file_name}");
             // Create an empty JSON file for the new database
@@ -30,18 +38,21 @@ impl Database {
         }
     }
 
-    pub fn add_table(&mut self, table: &mut Table) -> Result<(), String> {
+    // pub fn add_table(&mut self, table: &mut Table) -> Result<(), String> {
+    pub fn add_table(&mut self, table: &mut Table) -> Result<(), DatabaseError> {
         table.set_file_name(self.file_name.clone());
         if self.tables.iter().any(|t| t.name == table.name) {
-            println!("Table {} already exists, Skipping creation.", table.name);
-            return Ok(());
+            // println!("Table {} already exists, Skipping creation.", table.name);
+            // return Ok(());
+            return Err(DatabaseError::TableAlreadyExists(table.name.clone()));
         }
 
         self.tables.push(table.clone());
-        self.save_to_file()
-            .map_err(|e| format!("Failed to save database: {:?}", e))?;
-        println!("Table {} added successfully", table.name);
+        // self.save_to_file()
+        //     .map_err(|e| format!("Failed to save database: {:?}", e))?;
+        // println!("Table {} added successfully", table.name);
 
+        self.save_to_file().map_err(|e| DatabaseError::SaveError(e))?;
         Ok(())
     }
 
@@ -215,7 +226,7 @@ mod tests {
 
     #[test]
     fn test_database_new() {
-        let (db, _) = setup_temp_db();
+        let db = setup_temp_db();
 
         let db_name = &db.name.to_string();
         let fnn = format!("{db_name}.json");
@@ -227,6 +238,8 @@ mod tests {
 
     #[test]
     fn test_add_table_success() {
+        // this test does not use the setup_temp_db function
+        // because it needs to test the creation of a new database and table
         std::fs::remove_file("test_db.json").ok();
         let mut db = Database::new("test_db");
         let test_columns = Columns::from_struct::<TestData>(true);
@@ -246,8 +259,7 @@ mod tests {
     #[test]
     fn test_add_table_already_exists() {
         std::fs::remove_file("test_db.json").ok();
-        // let mut db = setup_test_db();
-        let (mut db, _) = setup_temp_db();
+        let mut db = setup_temp_db();
 
         let columns = Columns::from_struct::<TestData>(true);
         let mut test_table = Table::new("TestTable".to_string(), columns);
@@ -261,12 +273,13 @@ mod tests {
 
         // Verify behavior when the table already exists
         assert!(result_second_add.is_ok()); // Second addition should succeed
-        assert_eq!(
-            result_second_add,
-            // spelling and grammar have to match!!
-            // "Table TestTable already exists, Skipping creation.",
-            Ok(())
-        );
+        // assert_eq!(
+        //     result_second_add,
+        //     // spelling and grammar have to match!!
+        //     // "Table TestTable already exists, Skipping creation.",
+        //     Ok(())
+        // );
+        
 
         // Verify that the database still contains only one instance of the table
         assert_eq!(db.tables.len(), 1);

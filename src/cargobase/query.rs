@@ -226,10 +226,8 @@ impl Query {
 mod tests {
     use super::*;
     use serde_json::json;
-    // use tempfile::NamedTempFile;
 
     use crate::cargobase::setup_temp_db;
-    // use crate::Columns;
 
     #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
     struct TestData {
@@ -305,7 +303,7 @@ mod tests {
 
     #[test]
     fn test_query_all() {
-        let (mut db, _) = setup_temp_db();
+        let mut db = setup_temp_db();
 
         let test_data1 = TestData {
             id: "1".to_string(),
