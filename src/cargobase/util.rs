@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use tempfile::NamedTempFile;
+use tracing_subscriber::fmt;
 
 use super::{Columns, Database, Table};
 
@@ -22,4 +23,14 @@ pub fn setup_temp_db() -> Database {
     db.add_table(&mut table).unwrap();
 
     db
+}
+
+pub fn init_tracing() {
+    let subscriber = fmt::Subscriber::builder()
+        .with_max_level(tracing::Level::DEBUG)
+        .with_target(false)
+        .without_time()
+        .compact()
+        .finish();
+    tracing::subscriber::set_global_default(subscriber).expect("Failed to set subscriber");
 }
