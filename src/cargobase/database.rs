@@ -38,47 +38,39 @@ impl Database {
         }
     }
 
-    // pub fn add_table(&mut self, table: &mut Table) -> Result<(), String> {
     pub fn add_table(&mut self, table: &mut Table) -> Result<(), DatabaseError> {
         table.set_file_name(self.file_name.clone());
         if self.tables.iter().any(|t| t.name == table.name) {
-            // println!("Table {} already exists, Skipping creation.", table.name);
-            // return Ok(());
             return Err(DatabaseError::TableAlreadyExists(table.name.clone()));
         }
 
         self.tables.push(table.clone());
-        // self.save_to_file()
-        //     .map_err(|e| format!("Failed to save database: {:?}", e))?;
-        // println!("Table {} added successfully", table.name);
-
         self.save_to_file()
             .map_err(|e| DatabaseError::SaveError(e))?;
         Ok(())
     }
 
-    pub fn drop_table(&mut self, table_name: &str) -> Result<(), String> {
-        let mut db = Database::load_from_file(&self.file_name)
-            .map_err(|e| format!("Failed to laod database from file: {:?}", e))?;
+    // pub fn drop_table(&mut self, table_name: &str) -> Result<(), String> {
+    pub fn drop_table(&mut self, table_name: &str) -> Result<(), DatabaseError> {
+        let mut db =
+            Database::load_from_file(&self.file_name).map_err(|e| DatabaseError::LoadError(e))?;
 
         if let Some(index) = db.tables.iter().position(|t| t.name == table_name) {
             let removed_table = db.tables.remove(index);
             println!("Table {} dropped successfully", removed_table.name);
-            db.save_to_file()
-                .map_err(|e| format!("Failed to save database: {:?}", e))?;
+            db.save_to_file().map_err(|e| DatabaseError::SaveError(e))?;
 
             self.tables = db.tables;
             Ok(())
         } else {
-            Err(format!("Table {} not found", table_name))
+            Err(DatabaseError::TableNotFound(table_name.to_string()))
         }
     }
 
     pub(crate) fn save_to_file(&self) -> Result<(), std::io::Error> {
         let json_data = serde_json::to_string_pretty(&self)?;
         std::fs::write(&self.file_name, json_data)?;
-        // println!("Database saved to file: {}", self.file_name);
-        log::info!("Database saved to file: {}", self.file_name);
+        println!("Database saved to file: {}", self.file_name);
         Ok(())
     }
 
@@ -273,6 +265,31 @@ mod tests {
         }
 
         // Ensure no duplicate tables exist
+        assert_eq!(db.tables.len(), 1);
+    }
+
+    #[test]
+    fn test_drop_table_success() {
+        let mut db = setup_temp_db();
+        let result = db.drop_table("TestTable");
+
+        assert!(result.is_ok());
+        assert_eq!(db.tables.len(), 0);
+    }
+
+    #[test]
+    fn test_drop_table_not_found() {
+        let mut db = setup_temp_db();
+        let result = db.drop_table("NonExistentTable");
+
+        // Assert that an error is returned
+        assert!(matches!(result, Err(DatabaseError::TableNotFound(_))));
+
+        if let Err(DatabaseError::TableNotFound(name)) = result {
+            assert_eq!(name, "NonExistentTable");
+        }
+
+        // Ensure no tables were removed
         assert_eq!(db.tables.len(), 1);
     }
 }
