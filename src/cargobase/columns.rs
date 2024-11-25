@@ -27,16 +27,6 @@ impl Columns {
         Columns(columns)
     }
 
-    // pub fn from_struct<T: Serialize + Default>(required: bool) -> Self {
-    //     let value = json!(T::default());
-    //     let columns = if let Value::Object(map) = value {
-    //         map.keys().map(|key| Column::new(key, required)).collect()
-    //     } else {
-    //         vec![]
-    //     };
-    //     Columns(columns)
-    // }
-
     pub fn from_struct<T: Serialize + DeserializeOwned + Default>(required: bool) -> Self {
         // Initialize the reflection tracer
         let mut tracer = Tracer::new(TracerConfig::default());
@@ -84,6 +74,16 @@ impl Columns {
         }
     }
 }
+
+// pub fn from_struct<T: Serialize + Default>(required: bool) -> Self {
+//     let value = json!(T::default());
+//     let columns = if let Value::Object(map) = value {
+//         map.keys().map(|key| Column::new(key, required)).collect()
+//     } else {
+//         vec![]
+//     };
+//     Columns(columns)
+// }
 
 #[cfg(test)]
 mod tests {

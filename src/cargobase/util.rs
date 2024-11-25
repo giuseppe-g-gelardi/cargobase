@@ -28,9 +28,10 @@ pub fn setup_temp_db() -> Database {
 pub fn init_tracing() {
     let subscriber = fmt::Subscriber::builder()
         .with_max_level(tracing::Level::DEBUG)
-        .with_target(false)
-        .without_time()
-        .compact()
         .finish();
+    /*
+    example implementation:
+    info!(target: "cargobase", "Database `{name}` already exists, loading...");
+    */
     tracing::subscriber::set_global_default(subscriber).expect("Failed to set subscriber");
 }

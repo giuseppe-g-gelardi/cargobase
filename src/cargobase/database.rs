@@ -1,10 +1,7 @@
-use super::util::init_tracing;
-use super::{query::Operation, Query, Table};
 use serde::{Deserialize, Serialize};
 
-use tracing::{error, info};
-
 use super::DatabaseError;
+use super::{query::Operation, Query, Table};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct Database {
@@ -18,21 +15,19 @@ impl Database {
         let name = name.to_string();
         let file_name = format!("{name}.json");
 
-        init_tracing();
-
         if std::path::Path::new(&file_name).exists() {
-            info!("Database already exists: {name}, loading database");
+            println!("Database already exists: {name}, loading database");
 
             if let Ok(db) = Database::load_from_file(&file_name) {
                 return db;
             } else {
-                error!("Failed to load database from file: {file_name}");
+                eprintln!("Failed to load database from file: {file_name}");
             }
         } else {
-            info!("Creating new database: {file_name}");
+            println!("Creating new database: {file_name}");
             // Create an empty JSON file for the new database
             if let Err(e) = std::fs::write(&file_name, "{}") {
-                error!("Failed to create database file: {e}");
+                eprintln!("Failed to create database file: {e}");
             }
         }
 
@@ -55,20 +50,21 @@ impl Database {
         Ok(())
     }
 
-    // pub fn drop_table(&mut self, table_name: &str) -> Result<(), String> {
     pub fn drop_table(&mut self, table_name: &str) -> Result<(), DatabaseError> {
         let mut db =
             Database::load_from_file(&self.file_name).map_err(|e| DatabaseError::LoadError(e))?;
 
         if let Some(index) = db.tables.iter().position(|t| t.name == table_name) {
             let removed_table = db.tables.remove(index);
-            println!("Table {} dropped successfully", removed_table.name);
+            println!("Table `{}` dropped successfully", removed_table.name);
             db.save_to_file().map_err(|e| DatabaseError::SaveError(e))?;
 
             self.tables = db.tables;
             Ok(())
         } else {
-            Err(DatabaseError::TableNotFound(table_name.to_string()))
+            eprintln!("{}", DatabaseError::TableNotFound(table_name.to_string()));
+            // Err(DatabaseError::TableNotFound(table_name.to_string()))
+            Ok(())
         }
     }
 
