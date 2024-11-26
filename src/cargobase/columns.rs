@@ -27,6 +27,7 @@ impl Columns {
         Columns(columns)
     }
 
+    // remove required ?? 
     pub fn from_struct<T: Serialize + DeserializeOwned + Default>(required: bool) -> Self {
         // Initialize the reflection tracer
         let mut tracer = Tracer::new(TracerConfig::default());
@@ -252,6 +253,8 @@ mod tests {
             location: String,
         }
         let columns = Columns::from_struct::<TestData>(true);
+        // testing the order of the Columns as the from_struct method will 
+        // preserve the order of the struct fields as they are declared
         assert_eq!(columns.0.len(), 7);
         assert_eq!(columns.0[0].name.to_string(), "id".to_string());
         assert_eq!(columns.0[1].name.to_string(), "first_name".to_string());

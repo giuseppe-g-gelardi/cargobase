@@ -15,6 +15,9 @@ impl Database {
         let name = name.to_string();
         let file_name = format!("{name}.json");
 
+        // find a better way of logging this information for the end user
+        // -- they might not have tracing enabled
+
         if std::path::Path::new(&file_name).exists() {
             println!("Database already exists: {name}, loading database");
 
@@ -43,6 +46,11 @@ impl Database {
         if self.tables.iter().any(|t| t.name == table.name) {
             return Err(DatabaseError::TableAlreadyExists(table.name.clone()));
         }
+        // IF the table does not exist, add it to the database
+        // IF the table exists:
+        // -- do NOT add a duplicate to the db
+        // -- let the user know that the table already exists
+        // -- do NOT crash the program, just return and move on
 
         self.tables.push(table.clone());
         self.save_to_file()
@@ -59,12 +67,21 @@ impl Database {
             println!("Table `{}` dropped successfully", removed_table.name);
             db.save_to_file().map_err(|e| DatabaseError::SaveError(e))?;
 
+            // IF the table does not exist:
+            // -- let the user know that the table does not exist 
+            // -- do NOT crash the program, just return and move on
+            //
+            // IF the table exists:
+            // -- remove the table from the db 
+            // -- save the db to file
+            // -- let the user know that the table was removed successfully
+
             self.tables = db.tables;
             Ok(())
         } else {
-            eprintln!("{}", DatabaseError::TableNotFound(table_name.to_string()));
-            // Err(DatabaseError::TableNotFound(table_name.to_string()))
-            Ok(())
+            // eprintln!("{}", DatabaseError::TableNotFound(table_name.to_string()));
+            Err(DatabaseError::TableNotFound(table_name.to_string()))
+            // Ok(())
         }
     }
 
@@ -74,6 +91,39 @@ impl Database {
         println!("Database saved to file: {}", self.file_name);
         Ok(())
     }
+
+    // pub(crate) fn save_to_file(&self) -> Result<(), std::io::Error> {
+    //     // Serialize the overall structure with pretty formatting
+    //     let mut json_data = serde_json::to_string_pretty(self)?;
+    //
+    //     // Adjust the rows to be single-line JSON
+    //     if let Some(index) = json_data.find("\"rows\": [") {
+    //         let rows_start = index + "\"rows\": [".len();
+    //         let rows_end = json_data[rows_start..].find(']').unwrap_or(0) + rows_start;
+    //
+    //         // Extract and reformat rows
+    //         let rows_json = &json_data[rows_start..rows_end];
+    //         let formatted_rows = self
+    //             .tables
+    //             .iter()
+    //             .flat_map(|table| {
+    //                 table
+    //                     .rows
+    //                     .iter()
+    //                     .map(|row| serde_json::to_string(row).unwrap())
+    //             })
+    //             .collect::<Vec<_>>()
+    //             .join(",");
+    //
+    //         // Replace rows in the JSON data
+    //         json_data.replace_range(rows_start..rows_end, &formatted_rows);
+    //     }
+    //
+    //     // Save to file
+    //     std::fs::write(&self.file_name, json_data)?;
+    //     // tracing::info!(target: "cargobase", "Database saved to file: {}", self.file_name);
+    //     Ok(())
+    // }
 
     pub(crate) fn load_from_file(file_name: &str) -> Result<Self, std::io::Error> {
         let json_data = std::fs::read_to_string(file_name)?;
@@ -244,7 +294,7 @@ mod tests {
         assert!(result.is_ok());
         assert_eq!(db.tables.len(), 1);
         assert_eq!(db.tables[0].name, "TestTable");
-        assert_eq!(db.tables[0].file_name, Some("test_db.json".to_string()));
+        // assert_eq!(db.tables[0].file_name, Some("test_db.json".to_string()));
 
         // remove the test_db.json file after testing
         std::fs::remove_file("test_db.json").ok();

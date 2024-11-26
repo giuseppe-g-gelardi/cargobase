@@ -8,7 +8,7 @@ pub struct Table {
     pub(crate) name: String,
     pub rows: Vec<Row>,
     pub columns: Columns,
-    pub(crate) file_name: Option<String>, // reference to the db file_name
+    // pub(crate) file_name: Option<String>, // reference to the db file_name
 }
 
 impl Table {
@@ -17,12 +17,14 @@ impl Table {
             name,
             rows: Vec::new(),
             columns,
-            file_name: None,
+            // file_name: None,
         }
     }
 
+    // consider removing this. need to check what it is doing after removing the file name field
     pub(crate) fn set_file_name(&mut self, file_name: String) {
-        self.file_name = Some(file_name);
+        // self.file_name = Some(file_name);
+        println!("File name set to: {}", file_name);
     }
 
     pub fn add_row(&mut self, db: &mut Database, data: Value) {
@@ -84,7 +86,7 @@ mod tests {
         let columns = Columns::new(vec![Column::new("name", true), Column::new("age", false)]);
         let mut table = Table::new("users".to_string(), columns.clone());
         table.set_file_name("db.json".to_string());
-        assert_eq!(table.file_name, Some("db.json".to_string()));
+        // assert_eq!(table.file_name, Some("db.json".to_string()));
     }
 }
 

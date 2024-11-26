@@ -27,6 +27,7 @@ impl Query {
         self
     }
 
+    // from and to are identical 
     pub fn to(mut self, table_name: &str) -> Self {
         self.table_name = Some(table_name.to_string());
         self
@@ -67,6 +68,7 @@ impl Query {
         // Borrow the table by index
         let table = &mut db.tables[table_index];
 
+        // consider thiserror for the error handling for these operations
         match self.operation {
             Operation::Read => self.execute_select(table, key, value),
             Operation::Update => {
