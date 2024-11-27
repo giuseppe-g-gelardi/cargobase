@@ -5,6 +5,7 @@ pub mod row;
 pub mod table;
 pub mod util;
 pub mod errors;
+pub mod view;
 
 pub use columns::{Column, Columns};
 pub use database::Database;
@@ -13,3 +14,4 @@ pub use row::Row;
 pub use table::Table;
 pub use util::setup_temp_db;
 pub use errors::errors::DatabaseError;
+pub use view::View;

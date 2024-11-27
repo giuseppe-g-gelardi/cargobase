@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+use super::view::View;
 use super::DatabaseError;
 use super::{query::Operation, Query, Table};
 
@@ -52,16 +53,20 @@ impl Database {
         Ok(())
     }
 
+    // TODO: update this:
+    /*
+     * if the table does not exist, add it to the Database
+     *
+     * if the table exists:
+     * -- do NOT add a duplicate to the db
+     * -- let the user know that the table already exists
+     * -- do NOT crash the program, just return and move on
+     */
     pub fn add_table(&mut self, table: &mut Table) -> Result<(), DatabaseError> {
-        table.set_file_name(self.file_name.clone());
+        // table.set_file_name(self.file_name.clone());
         if self.tables.iter().any(|t| t.name == table.name) {
             return Err(DatabaseError::TableAlreadyExists(table.name.clone()));
         }
-        // IF the table does not exist, add it to the database
-        // IF the table exists:
-        // -- do NOT add a duplicate to the db
-        // -- let the user know that the table already exists
-        // -- do NOT crash the program, just return and move on
 
         self.tables.push(table.clone());
         self.save_to_file()
@@ -69,6 +74,17 @@ impl Database {
         Ok(())
     }
 
+    // TODO: update this:
+    /*
+     * IF the table does not exist:
+     * -- let the user know that the table does not exist
+     * -- do NOT crash the program, just return and move on
+     *
+     * IF the table exists:
+     * -- remove the table from the db
+     * -- save the db to file
+     * -- let the user know that the table was removed successfully
+     */
     pub fn drop_table(&mut self, table_name: &str) -> Result<(), DatabaseError> {
         let mut db =
             Database::load_from_file(&self.file_name).map_err(|e| DatabaseError::LoadError(e))?;
@@ -77,15 +93,6 @@ impl Database {
             let removed_table = db.tables.remove(index);
             println!("Table `{}` dropped successfully", removed_table.name);
             db.save_to_file().map_err(|e| DatabaseError::SaveError(e))?;
-
-            // IF the table does not exist:
-            // -- let the user know that the table does not exist
-            // -- do NOT crash the program, just return and move on
-            //
-            // IF the table exists:
-            // -- remove the table from the db
-            // -- save the db to file
-            // -- let the user know that the table was removed successfully
 
             self.tables = db.tables;
             Ok(())
@@ -164,141 +171,13 @@ impl Database {
     }
 
     pub fn view(&self) {
-        println!("Database: {}", self.name);
-
-        for table in &self.tables {
-            println!("\nTable: {}", table.name);
-
-            if table.columns.0.is_empty() {
-                println!("No columns defined for table '{}'.", table.name);
-                continue;
-            }
-
-            // Get column names and determine maximum width for each column
-            let column_names: Vec<&str> = table
-                .columns
-                .0
-                .iter()
-                .map(|col| col.name.as_str())
-                .collect();
-            let mut column_widths: Vec<usize> =
-                column_names.iter().map(|name| name.len()).collect();
-
-            // Adjust column widths based on the content of each row
-            for row in &table.rows {
-                for (i, column) in table.columns.0.iter().enumerate() {
-                    let value = row
-                        .data
-                        .get(&column.name)
-                        .unwrap_or(&serde_json::Value::Null)
-                        .to_string();
-                    column_widths[i] = column_widths[i].max(value.len());
-                }
-            }
-
-            // Print the header row
-            let header: Vec<String> = column_names
-                .iter()
-                .enumerate()
-                .map(|(i, &name)| format!("{:<width$}", name, width = column_widths[i]))
-                .collect();
-            println!("{}", header.join(" | "));
-
-            // Print a separator line
-            let separator: Vec<String> = column_widths
-                .iter()
-                .map(|&width| "-".repeat(width))
-                .collect();
-            println!("{}", separator.join("-+-"));
-
-            // Print each row of data
-            for row in &table.rows {
-                let row_data: Vec<String> = table
-                    .columns
-                    .0
-                    .iter()
-                    .enumerate()
-                    .map(|(i, column)| {
-                        let value = row
-                            .data
-                            .get(&column.name)
-                            .unwrap_or(&serde_json::Value::Null)
-                            .to_string();
-                        format!("{:<width$}", value, width = column_widths[i])
-                    })
-                    .collect();
-                println!("{}", row_data.join(" | "));
-            }
-        }
+        let view = View::new(self);
+        view.all_tables();
     }
 
     pub fn view_table(&self, table_name: &str) {
-        if let Some(table) = self.tables.iter().find(|t| t.name == table_name) {
-            println!("Table: {}", table.name);
-
-            if table.columns.0.is_empty() {
-                println!("No columns defined for table '{}'.", table.name);
-                return;
-            }
-
-            // Get column names and determine maximum width for each column
-            let column_names: Vec<&str> = table
-                .columns
-                .0
-                .iter()
-                .map(|col| col.name.as_str())
-                .collect();
-            let mut column_widths: Vec<usize> =
-                column_names.iter().map(|name| name.len()).collect();
-
-            // Adjust column widths based on the content of each row
-            for row in &table.rows {
-                for (i, column) in table.columns.0.iter().enumerate() {
-                    let value = row
-                        .data
-                        .get(&column.name)
-                        .unwrap_or(&serde_json::Value::Null)
-                        .to_string();
-                    column_widths[i] = column_widths[i].max(value.len());
-                }
-            }
-
-            // Print the header row
-            let header: Vec<String> = column_names
-                .iter()
-                .enumerate()
-                .map(|(i, &name)| format!("{:<width$}", name, width = column_widths[i]))
-                .collect();
-            println!("{}", header.join(" | "));
-
-            // Print a separator line
-            let separator: Vec<String> = column_widths
-                .iter()
-                .map(|&width| "-".repeat(width))
-                .collect();
-            println!("{}", separator.join("-+-"));
-
-            // Print each row of data
-            for row in &table.rows {
-                let row_data: Vec<String> = table
-                    .columns
-                    .0
-                    .iter()
-                    .enumerate()
-                    .map(|(i, column)| {
-                        let value = row
-                            .data
-                            .get(&column.name)
-                            .unwrap_or(&serde_json::Value::Null)
-                            .to_string();
-                        format!("{:<width$}", value, width = column_widths[i])
-                    })
-                    .collect();
-                println!("{}", row_data.join(" | "));
-            }
-        } else {
-            println!("Table '{}' not found in the database.", table_name);
-        }
+        let view = View::new(self);
+        view.single_table(table_name);
     }
 }
 
