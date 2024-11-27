@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use tracing;
 
 use super::view::View;
 use super::DatabaseError;
@@ -20,18 +21,19 @@ impl Database {
         // -- they might not have tracing enabled
 
         if std::path::Path::new(&file_name).exists() {
-            println!("Database already exists: {name}, loading database");
+            tracing::info!("Database already exists: {name}, loading database");
 
+            // Load the database from the file
             if let Ok(db) = Database::load_from_file(&file_name) {
                 return db;
             } else {
-                eprintln!("Failed to load database from file: {file_name}");
+                tracing::error!("Failed to load database from file: {file_name}");
             }
         } else {
-            println!("Creating new database: {file_name}");
+            tracing::info!("Creating new database: {file_name}");
             // Create an empty JSON file for the new database
             if let Err(e) = std::fs::write(&file_name, "{}") {
-                eprintln!("Failed to create database file: {e}");
+                tracing::error!("Failed to create database file: {e}");
             }
         }
 
@@ -44,28 +46,26 @@ impl Database {
 
     pub fn drop_database(&self) -> Result<(), DatabaseError> {
         if std::fs::remove_file(&self.file_name).is_err() {
-            return Err(DatabaseError::DeleteError(
-                "Failed to delete database file".to_string(),
-            ));
+            tracing::error!(
+                "{}",
+                DatabaseError::DeleteError("Failed to delete database file".to_string())
+            );
+
+            // should we crash the program?
+            // return Err(DatabaseError::DeleteError("Failed to delete database file".to_string(),));
         }
 
-        println!("Database `{}` dropped successfully", self.name);
+        tracing::info!("Database `{}` dropped successfully", self.name);
         Ok(())
     }
 
-    // TODO: update this:
-    /*
-     * if the table does not exist, add it to the Database
-     *
-     * if the table exists:
-     * -- do NOT add a duplicate to the db
-     * -- let the user know that the table already exists
-     * -- do NOT crash the program, just return and move on
-     */
     pub fn add_table(&mut self, table: &mut Table) -> Result<(), DatabaseError> {
-        // table.set_file_name(self.file_name.clone());
         if self.tables.iter().any(|t| t.name == table.name) {
-            return Err(DatabaseError::TableAlreadyExists(table.name.clone()));
+            tracing::warn!(
+                "{}",
+                DatabaseError::TableAlreadyExists(table.name.to_string())
+            );
+            return Ok(());
         }
 
         self.tables.push(table.clone());
@@ -74,45 +74,34 @@ impl Database {
         Ok(())
     }
 
-    // TODO: update this:
-    /*
-     * IF the table does not exist:
-     * -- let the user know that the table does not exist
-     * -- do NOT crash the program, just return and move on
-     *
-     * IF the table exists:
-     * -- remove the table from the db
-     * -- save the db to file
-     * -- let the user know that the table was removed successfully
-     */
     pub fn drop_table(&mut self, table_name: &str) -> Result<(), DatabaseError> {
         let mut db =
             Database::load_from_file(&self.file_name).map_err(|e| DatabaseError::LoadError(e))?;
 
         if let Some(index) = db.tables.iter().position(|t| t.name == table_name) {
             let removed_table = db.tables.remove(index);
-            println!("Table `{}` dropped successfully", removed_table.name);
+            tracing::info!("Table `{}` dropped successfully", removed_table.name);
             db.save_to_file().map_err(|e| DatabaseError::SaveError(e))?;
 
             self.tables = db.tables;
             Ok(())
         } else {
-            // eprintln!("{}", DatabaseError::TableNotFound(table_name.to_string()));
-            Err(DatabaseError::TableNotFound(table_name.to_string()))
-            // Ok(())
+            tracing::error!("{}", DatabaseError::TableNotFound(table_name.to_string()));
+            Ok(())
         }
     }
 
     pub(crate) fn save_to_file(&self) -> Result<(), std::io::Error> {
         let json_data = serde_json::to_string_pretty(&self)?;
         std::fs::write(&self.file_name, json_data)?;
-        println!("Database saved to file: {}", self.file_name);
+        tracing::info!("Database saved to file: {}", self.file_name);
         Ok(())
     }
 
     pub(crate) fn load_from_file(file_name: &str) -> Result<Self, std::io::Error> {
         let json_data = std::fs::read_to_string(file_name)?;
         let db: Database = serde_json::from_str(&json_data)?;
+        tracing::info!("Database loaded from file: {}", file_name); // needed?
         Ok(db)
     }
 
@@ -183,10 +172,11 @@ impl Database {
 
 #[cfg(test)]
 mod tests {
-    use crate::cargobase::setup_temp_db;
-    use crate::{Columns, Table};
+    use tracing_test::traced_test;
 
     use super::*;
+    use crate::cargobase::setup_temp_db;
+    use crate::{Columns, Table};
 
     #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
     struct TestData {
@@ -235,23 +225,25 @@ mod tests {
         std::fs::remove_file("test_db.json").ok();
     }
 
+    #[traced_test]
     #[test]
     fn test_add_table_already_exists() {
         let mut db = setup_temp_db();
 
+        // Create a duplicate table
         let columns = Columns::from_struct::<TestData>(true);
         let mut duplicate_table = Table::new("TestTable".to_string(), columns);
         let result = db.add_table(&mut duplicate_table);
 
-        // Assert that an error is returned
-        assert!(matches!(result, Err(DatabaseError::TableAlreadyExists(_))));
-
-        if let Err(DatabaseError::TableAlreadyExists(name)) = result {
-            assert_eq!(name, "TestTable");
-        }
+        // Assert that the result is Ok(()) even when the table already exists
+        assert!(result.is_ok());
 
         // Ensure no duplicate tables exist
         assert_eq!(db.tables.len(), 1);
+
+        let db_error = DatabaseError::TableAlreadyExists("TestTable".to_string());
+        let logs = logs_contain(&format!("{}", db_error));
+        assert!(logs, "Expected warning log for existing table not found.");
     }
 
     #[test]
@@ -263,17 +255,18 @@ mod tests {
         assert_eq!(db.tables.len(), 0);
     }
 
+    #[traced_test]
     #[test]
     fn test_drop_table_not_found() {
         let mut db = setup_temp_db();
         let result = db.drop_table("NonExistentTable");
 
-        // Assert that an error is returned
-        assert!(matches!(result, Err(DatabaseError::TableNotFound(_))));
+        assert!(result.is_ok());
 
-        if let Err(DatabaseError::TableNotFound(name)) = result {
-            assert_eq!(name, "NonExistentTable");
-        }
+        // Assert that an error is returned
+        let db_error = DatabaseError::TableNotFound("NonExistentTable".to_string());
+        let logs = logs_contain(&format!("{}", db_error));
+        assert!(logs, "Expected error log for non-existent table not found.");
 
         // Ensure no tables were removed
         assert_eq!(db.tables.len(), 1);
