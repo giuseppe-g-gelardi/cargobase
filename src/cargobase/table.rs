@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use tracing;
 
 use super::{Columns, Database, Row};
 
@@ -31,10 +32,10 @@ impl Table {
                 table.rows.push(Row::new(data))
             }
             let _ = db.save_to_file().map_err(|e| {
-                println!("Failed to save to file: {}", e);
+                tracing::error!("Failed to save to file: {}", e);
             });
         } else {
-            println!("Table {} not found", self.name);
+            tracing::error!("Table {} not found", self.name);
         }
     }
 }
@@ -59,4 +60,6 @@ mod tests {
         // table.set_file_name("db.json".to_string());
         assert_eq!(table.name, "users");
     }
+
+    // test add row...
 }
