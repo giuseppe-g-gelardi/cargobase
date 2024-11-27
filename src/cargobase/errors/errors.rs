@@ -8,6 +8,10 @@ pub enum DatabaseError {
     #[error("Failed to save the database: {0}")]
     SaveError(std::io::Error),
 
+    #[error("Failed to drop database: {0}")]
+    // return Err(DatabaseError::DeleteError);
+    DeleteError(String),
+
     #[error("Table `{0}` already exists")] // skipping creation
     TableAlreadyExists(String),
 

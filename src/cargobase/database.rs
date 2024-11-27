@@ -41,6 +41,18 @@ impl Database {
         }
     }
 
+    pub fn drop_database(&self) -> Result<(), DatabaseError> {
+        // Remove the database file
+        if std::fs::remove_file(&self.file_name).is_err() {
+            return Err(DatabaseError::DeleteError(
+                "Failed to delete database file".to_string(),
+            ));
+        }
+
+        println!("Database `{}` dropped successfully", self.name);
+        Ok(())
+    }
+
     pub fn add_table(&mut self, table: &mut Table) -> Result<(), DatabaseError> {
         table.set_file_name(self.file_name.clone());
         if self.tables.iter().any(|t| t.name == table.name) {
@@ -68,11 +80,11 @@ impl Database {
             db.save_to_file().map_err(|e| DatabaseError::SaveError(e))?;
 
             // IF the table does not exist:
-            // -- let the user know that the table does not exist 
+            // -- let the user know that the table does not exist
             // -- do NOT crash the program, just return and move on
             //
             // IF the table exists:
-            // -- remove the table from the db 
+            // -- remove the table from the db
             // -- save the db to file
             // -- let the user know that the table was removed successfully
 
@@ -91,39 +103,6 @@ impl Database {
         println!("Database saved to file: {}", self.file_name);
         Ok(())
     }
-
-    // pub(crate) fn save_to_file(&self) -> Result<(), std::io::Error> {
-    //     // Serialize the overall structure with pretty formatting
-    //     let mut json_data = serde_json::to_string_pretty(self)?;
-    //
-    //     // Adjust the rows to be single-line JSON
-    //     if let Some(index) = json_data.find("\"rows\": [") {
-    //         let rows_start = index + "\"rows\": [".len();
-    //         let rows_end = json_data[rows_start..].find(']').unwrap_or(0) + rows_start;
-    //
-    //         // Extract and reformat rows
-    //         let rows_json = &json_data[rows_start..rows_end];
-    //         let formatted_rows = self
-    //             .tables
-    //             .iter()
-    //             .flat_map(|table| {
-    //                 table
-    //                     .rows
-    //                     .iter()
-    //                     .map(|row| serde_json::to_string(row).unwrap())
-    //             })
-    //             .collect::<Vec<_>>()
-    //             .join(",");
-    //
-    //         // Replace rows in the JSON data
-    //         json_data.replace_range(rows_start..rows_end, &formatted_rows);
-    //     }
-    //
-    //     // Save to file
-    //     std::fs::write(&self.file_name, json_data)?;
-    //     // tracing::info!(target: "cargobase", "Database saved to file: {}", self.file_name);
-    //     Ok(())
-    // }
 
     pub(crate) fn load_from_file(file_name: &str) -> Result<Self, std::io::Error> {
         let json_data = std::fs::read_to_string(file_name)?;
@@ -278,6 +257,15 @@ mod tests {
         assert_eq!(db.name, db_name.to_string());
         assert_eq!(db.file_name, fnn);
         assert_eq!(db.tables.len(), 1); // the setup_temp_db function adds a table
+    }
+
+    #[test]
+    fn test_drop_database() {
+        let db = setup_temp_db();
+        let result = db.drop_database();
+
+        assert!(result.is_ok());
+        assert!(!std::path::Path::new(&db.file_name).exists());
     }
 
     #[test]
