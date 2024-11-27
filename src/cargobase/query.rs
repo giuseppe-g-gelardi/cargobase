@@ -2,7 +2,7 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use super::{Database, Row, Table};
+use super::{Database, DatabaseError, Row, Table};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Copy)]
 pub enum Operation {
@@ -81,33 +81,38 @@ impl Query {
         }
     }
 
-    pub fn execute_add(self) -> Result<(), String> {
+    // pub fn execute_add(self) -> Result<(), String> {
+    pub fn execute_add(self) -> Result<(), DatabaseError> {
         let mut db = Database::load_from_file(&self.db_file_name)
-            .map_err(|e| format!("Failed to load database: {}", e))?;
+            .map_err(DatabaseError::LoadError)?;
+            // .map_err(|e| format!("Failed to load database: {}", e))?;
 
         let table_name = self
             .table_name
             .clone()
-            .ok_or_else(|| "Table name not specified.".to_string())?;
+            .ok_or_else(|| DatabaseError::InvalidData("Table name not specified.".to_string()))?;
+            // .ok_or_else(|| "Table name not specified.".to_string())?;
 
         // Find the table
         let table = db
             .tables
             .iter_mut()
             .find(|t| t.name == table_name)
-            .ok_or_else(|| format!("Table '{}' not found.", table_name))?;
+            .ok_or_else(|| DatabaseError::TableNotFound(table_name.clone()))?;
+            // .ok_or_else(|| format!("Table '{}' not found.", table_name))?;
 
         // Validate and add the row
         if let Some(row_data) = self.row_data {
             table.columns.validate(row_data.clone())?; // optional schema validation
             table.rows.push(Row::new(row_data));
 
-            db.save_to_file()
-                .map_err(|e| format!("Failed to save database: {}", e))?;
+            db.save_to_file().map_err(DatabaseError::SaveError)?;
+                // .map_err(|e| format!("Failed to save database: {}", e))?;
             println!("Row added successfully to '{}'.", table_name);
             Ok(())
         } else {
-            Err("No data provided for the new row.".to_string())
+            // Err("No data provided for the new row.".to_string())
+            Err(DatabaseError::InvalidData("No data provided for the new row.".to_string()))
         }
     }
 

@@ -26,4 +26,7 @@ pub enum DatabaseError {
 
     #[error("Column `{0}` is missing from the row data")]
     MissingColumn(String),
+
+    #[error("Column `{0}` is required")]
+    ColumnRequiredError(String),
 }
