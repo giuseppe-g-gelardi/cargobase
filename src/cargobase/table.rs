@@ -19,11 +19,6 @@ impl Table {
         }
     }
 
-    // consider removing this. need to check what it is doing after removing the file name field
-    // pub(crate) fn set_file_name(&mut self, file_name: String) {
-    //     println!("File name set to: {}", file_name);
-    // }
-
     pub fn add_row(&mut self, db: &mut Database, data: Value) {
         if let Some(table) = db.get_table_mut(&self.name) {
             if data.is_array() {
