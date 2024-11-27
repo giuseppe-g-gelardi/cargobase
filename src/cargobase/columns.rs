@@ -27,7 +27,7 @@ impl Columns {
         Columns(columns)
     }
 
-    // remove required ?? 
+    // remove required ??
     pub fn from_struct<T: Serialize + DeserializeOwned + Default>(required: bool) -> Self {
         // Initialize the reflection tracer
         let mut tracer = Tracer::new(TracerConfig::default());
@@ -76,16 +76,6 @@ impl Columns {
     }
 }
 
-// pub fn from_struct<T: Serialize + Default>(required: bool) -> Self {
-//     let value = json!(T::default());
-//     let columns = if let Value::Object(map) = value {
-//         map.keys().map(|key| Column::new(key, required)).collect()
-//     } else {
-//         vec![]
-//     };
-//     Columns(columns)
-// }
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -107,45 +97,6 @@ mod tests {
         assert_eq!(columns.0[1].name, "age");
         assert_eq!(columns.0[1].required, false);
     }
-
-    // #[test]
-    // fn test_columns_from_struct() {
-    //     #[derive(Serialize, Deserialize, Default)]
-    //     struct Test {
-    //         name: String,
-    //         age: String,
-    //     }
-    //     // the from_struct method will organize the columns in alphabetical order
-    //
-    //     let columns = Columns::from_struct::<Test>(true);
-    //     assert_eq!(columns.0.len(), 2);
-    //     assert_eq!(columns.0[0].name.to_string(), "age".to_string());
-    //     assert_eq!(columns.0[0].required, true);
-    //     assert_eq!(columns.0[1].name.to_string(), "name".to_string());
-    //     assert_eq!(columns.0[1].required, true);
-    //
-    //     println!("generated columns: {:#?}", columns);
-    // }
-
-    // #[test]
-    // fn test_columns_from_struct_required_false() {
-    //     #[derive(Serialize, Deserialize, Default)]
-    //     struct Test {
-    //         name: String,
-    //         age: String,
-    //     }
-    //     // the from_struct method will organize the columns in a random order
-    //     // need to fix this
-    //
-    //     let columns = Columns::from_struct::<Test>(false);
-    //     assert_eq!(columns.0.len(), 2);
-    //     assert_eq!(columns.0[0].name.to_string(), "age".to_string());
-    //     assert_eq!(columns.0[0].required, false);
-    //     assert_eq!(columns.0[1].name.to_string(), "name".to_string());
-    //     assert_eq!(columns.0[1].required, false);
-    //
-    //     println!("generated columns: {:#?}", columns);
-    // }
 
     #[test]
     fn test_validate_valid_row() {
@@ -253,7 +204,7 @@ mod tests {
             location: String,
         }
         let columns = Columns::from_struct::<TestData>(true);
-        // testing the order of the Columns as the from_struct method will 
+        // testing the order of the Columns as the from_struct method will
         // preserve the order of the struct fields as they are declared
         assert_eq!(columns.0.len(), 7);
         assert_eq!(columns.0[0].name.to_string(), "id".to_string());

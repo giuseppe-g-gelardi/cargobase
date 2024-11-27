@@ -27,12 +27,6 @@ impl Query {
         self
     }
 
-    // from and to are identical 
-    pub fn to(mut self, table_name: &str) -> Self {
-        self.table_name = Some(table_name.to_string());
-        self
-    }
-
     pub fn data(mut self, data: Value) -> Self {
         self.update_data = Some(data);
         self
@@ -261,7 +255,8 @@ mod tests {
             row_data: None,
         };
 
-        let updated_query = query.to("TestTable");
+        // let updated_query = query.to("TestTable");
+        let updated_query = query.from("TestTable");
         assert_eq!(updated_query.table_name, Some("TestTable".to_string()));
     }
 
@@ -317,13 +312,13 @@ mod tests {
         };
 
         db.add_row()
-            .to("TestTable")
+            .from("TestTable")
             .data_from_struct(test_data1.clone())
             .execute_add()
             .expect("Failed to add row 1");
 
         db.add_row()
-            .to("TestTable")
+            .from("TestTable")
             .data_from_struct(test_data2.clone())
             .execute_add()
             .expect("Failed to add row 2");
@@ -352,101 +347,3 @@ mod tests {
         assert_eq!(updated_query.update_data, Some(data));
     }
 }
-
-// #[test]
-// fn test_query_where_eq_select() {
-//     std::fs::remove_file("test_db.json").ok();
-//     let mut db = setup_test_db();
-//
-//     // Insert test data
-//     let test_data = TestData {
-//         id: "123".to_string(),
-//         name: "John Doe".to_string(),
-//     };
-//
-//     db.add_row()
-//         .to("TestTable")
-//         .data_from_struct(test_data.clone())
-//         .execute_add()
-//         .expect("Failed to add row");
-//
-//     // Query for the row
-//     let result: Option<TestData> = db
-//         .get_single()
-//         .from("TestTable")
-//         .where_eq("id", "123")
-//         .expect("Query failed");
-//
-//     assert_eq!(result, Some(test_data));
-//     std::fs::remove_file("test_db.json").ok();
-// }
-//
-// #[test]
-// fn test_query_where_eq_update() {
-//     std::fs::remove_file("test_db.json").ok();
-//     let mut db = setup_test_db();
-//
-//     // Insert test data
-//     let test_data = TestData {
-//         id: "123".to_string(),
-//         name: "John Doe".to_string(),
-//     };
-//
-//     db.add_row()
-//         .to("TestTable")
-//         .data_from_struct(test_data.clone())
-//         .execute_add()
-//         .expect("Failed to add row");
-//
-//     // Update the row
-//     let update_data = json!({ "name": "Jane Doe" });
-//     let result: Option<TestData> = db
-//         .update_row()
-//         .from("TestTable")
-//         .data(update_data.clone())
-//         .where_eq("id", "123")
-//         .expect("Update failed");
-//
-//     // Validate the updated data
-//     assert_eq!(
-//         result,
-//         Some(TestData {
-//             id: "123".to_string(),
-//             name: "Jane Doe".to_string(),
-//         })
-//     );
-//     std::fs::remove_file("test_db.json").ok();
-// }
-//
-// #[test]
-// fn test_query_where_eq_delete() {
-//     std::fs::remove_file("test_db.json").ok();
-//     let mut db = setup_test_db();
-//
-//     // Insert test data
-//     let test_data = TestData {
-//         id: "123".to_string(),
-//         name: "John Doe".to_string(),
-//     };
-//
-//     db.add_row()
-//         .to("TestTable")
-//         .data_from_struct(test_data.clone())
-//         .execute_add()
-//         .expect("Failed to add row");
-//
-//     // Delete the row
-//     let result: Option<TestData> = db
-//         .delete_single()
-//         .from("TestTable")
-//         .where_eq("id", "123")
-//         .expect("Delete failed");
-//
-//     // Validate the deleted data
-//     assert_eq!(result, Some(test_data));
-//
-//     // Ensure the row no longer exists
-//     let rows: Vec<TestData> = db.get_rows().from("TestTable").all();
-//     assert!(rows.is_empty());
-//     std::fs::remove_file("test_db.json").ok();
-// }
