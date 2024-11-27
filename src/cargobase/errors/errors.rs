@@ -29,4 +29,7 @@ pub enum DatabaseError {
 
     #[error("Column `{0}` is required")]
     ColumnRequiredError(String),
+
+    #[error("")] // could expand to specify serialization/deserialization error
+    JSONError(#[from] serde_json::Error),
 }
