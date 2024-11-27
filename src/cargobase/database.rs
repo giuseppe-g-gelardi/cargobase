@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use tracing::{error, info, warn};
+use tracing;
 
 use super::view::View;
 use super::DatabaseError;
@@ -21,19 +21,19 @@ impl Database {
         // -- they might not have tracing enabled
 
         if std::path::Path::new(&file_name).exists() {
-            info!("Database already exists: {name}, loading database");
+            tracing::info!("Database already exists: {name}, loading database");
 
             // Load the database from the file
             if let Ok(db) = Database::load_from_file(&file_name) {
                 return db;
             } else {
-                error!("Failed to load database from file: {file_name}");
+                tracing::error!("Failed to load database from file: {file_name}");
             }
         } else {
-            info!("Creating new database: {file_name}");
+            tracing::info!("Creating new database: {file_name}");
             // Create an empty JSON file for the new database
             if let Err(e) = std::fs::write(&file_name, "{}") {
-                error!("Failed to create database file: {e}");
+                tracing::error!("Failed to create database file: {e}");
             }
         }
 
@@ -46,24 +46,22 @@ impl Database {
 
     pub fn drop_database(&self) -> Result<(), DatabaseError> {
         if std::fs::remove_file(&self.file_name).is_err() {
-            error!(
+            tracing::error!(
                 "{}",
                 DatabaseError::DeleteError("Failed to delete database file".to_string())
             );
 
             // should we crash the program?
-            // return Err(DatabaseError::DeleteError(
-            //     "Failed to delete database file".to_string(),
-            // ));
+            // return Err(DatabaseError::DeleteError("Failed to delete database file".to_string(),));
         }
 
-        info!("Database `{}` dropped successfully", self.name);
+        tracing::info!("Database `{}` dropped successfully", self.name);
         Ok(())
     }
 
     pub fn add_table(&mut self, table: &mut Table) -> Result<(), DatabaseError> {
         if self.tables.iter().any(|t| t.name == table.name) {
-            warn!(
+            tracing::warn!(
                 "{}",
                 DatabaseError::TableAlreadyExists(table.name.to_string())
             );
@@ -82,13 +80,13 @@ impl Database {
 
         if let Some(index) = db.tables.iter().position(|t| t.name == table_name) {
             let removed_table = db.tables.remove(index);
-            info!("Table `{}` dropped successfully", removed_table.name);
+            tracing::info!("Table `{}` dropped successfully", removed_table.name);
             db.save_to_file().map_err(|e| DatabaseError::SaveError(e))?;
 
             self.tables = db.tables;
             Ok(())
         } else {
-            error!("{}", DatabaseError::TableNotFound(table_name.to_string()));
+            tracing::error!("{}", DatabaseError::TableNotFound(table_name.to_string()));
             Ok(())
         }
     }
@@ -96,14 +94,14 @@ impl Database {
     pub(crate) fn save_to_file(&self) -> Result<(), std::io::Error> {
         let json_data = serde_json::to_string_pretty(&self)?;
         std::fs::write(&self.file_name, json_data)?;
-        info!("Database saved to file: {}", self.file_name);
+        tracing::info!("Database saved to file: {}", self.file_name);
         Ok(())
     }
 
     pub(crate) fn load_from_file(file_name: &str) -> Result<Self, std::io::Error> {
         let json_data = std::fs::read_to_string(file_name)?;
         let db: Database = serde_json::from_str(&json_data)?;
-        info!("Database loaded from file: {}", file_name); // needed?
+        tracing::info!("Database loaded from file: {}", file_name); // needed?
         Ok(db)
     }
 

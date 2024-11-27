@@ -2,7 +2,7 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use serde_reflection::{ContainerFormat, Named, Tracer, TracerConfig};
-use tracing::error;
+use tracing;
 
 use super::DatabaseError;
 
@@ -64,7 +64,7 @@ impl Columns {
             for column in &self.0 {
                 if column.required && !data.contains_key(&column.name) {
                     let error_message = format!("Column '{}' is required.", column.name);
-                    error!("{}", error_message);
+                    tracing::error!("{}", error_message);
                     return Err(DatabaseError::ColumnRequiredError(error_message));
                 }
             }
@@ -72,13 +72,13 @@ impl Columns {
             for key in data.keys() {
                 if !self.0.iter().any(|col| col.name == *key) {
                     let error_message = format!("Column '{}' is not valid.", key);
-                    error!("{}", error_message);
+                    tracing::error!("{}", error_message);
                     return Err(DatabaseError::InvalidData(error_message));
                 }
             }
             Ok(())
         } else {
-            error!("Invalid row data.");
+            tracing::error!("Invalid row data.");
             Err(DatabaseError::InvalidData("Invalid row data.".to_string()))
         }
     }
