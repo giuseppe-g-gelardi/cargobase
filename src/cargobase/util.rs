@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use tempfile::NamedTempFile;
-use tracing_subscriber::fmt;
+// use tracing_subscriber::fmt::Subscriber;
 
 use super::{Columns, Database, Table};
 
@@ -25,13 +25,14 @@ pub fn setup_temp_db() -> Database {
     db
 }
 
-pub fn init_tracing() {
-    let subscriber = fmt::Subscriber::builder()
-        .with_max_level(tracing::Level::WARN)
-        .finish();
-    /*
-    example implementation:
-    info!(target: "cargobase", "Database `{name}` already exists, loading...");
-    */
-    tracing::subscriber::set_global_default(subscriber).expect("Failed to set subscriber");
-}
+// pub fn init_tracing() {
+//     // let subscriber = fmt::Subscriber::builder()
+//     let subscriber = Subscriber::builder()
+//         .with_max_level(tracing::Level::WARN)
+//         .finish();
+//     /*
+//     example implementation:
+//     info!(target: "cargobase", "Database `{name}` already exists, loading...");
+//     */
+//     tracing::subscriber::set_global_default(subscriber).expect("Failed to set subscriber");
+// }
