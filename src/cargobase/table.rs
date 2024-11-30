@@ -42,8 +42,11 @@ impl Table {
 
 #[cfg(test)]
 mod tests {
-    use super::super::Column;
+    use super::super::{setup_temp_db, Column, Columns};
     use super::*;
+
+    use serde_json::json;
+    use tracing_test::traced_test;
 
     #[test]
     fn test_table_new() {
@@ -53,13 +56,90 @@ mod tests {
         assert_eq!(table.columns, columns);
     }
 
+    // #[test]
+    // fn test_table_set_file_name() {
+    //     let columns = Columns::new(vec![Column::new("name", true), Column::new("age", false)]);
+    //     let table = Table::new("users".to_string(), columns.clone());
+    //     // table.set_file_name("db.json".to_string());
+    //     assert_eq!(table.name, "users");
+    // }
+
     #[test]
-    fn test_table_set_file_name() {
-        let columns = Columns::new(vec![Column::new("name", true), Column::new("age", false)]);
-        let table = Table::new("users".to_string(), columns.clone());
-        // table.set_file_name("db.json".to_string());
-        assert_eq!(table.name, "users");
+    fn test_table_add_row_single() {
+        let mut db = setup_temp_db();
+        let mut table = Table::new(
+            "TestTable".to_string(),
+            Columns::new(vec![Column::new("id", true), Column::new("name", true)]),
+        );
+        db.add_table(&mut table).unwrap();
+
+        let row_data = json!({"id": "1", "name": "John Doe"});
+        table.add_row(&mut db, row_data);
+
+        assert_eq!(db.tables[0].rows.len(), 1);
+        assert_eq!(
+            db.tables[0].rows[0].data,
+            json!({"id": "1", "name": "John Doe"})
+        );
     }
 
-    // test add row...
+    #[test]
+    fn test_table_add_row_array() {
+        let mut db = setup_temp_db();
+        let mut table = Table::new(
+            "TestTable".to_string(),
+            Columns::new(vec![Column::new("id", true), Column::new("name", true)]),
+        );
+        db.add_table(&mut table).unwrap();
+
+        let row_data = json!([
+            {"id": "1", "name": "John Doe"},
+            {"id": "2", "name": "Jane Doe"}
+        ]);
+        table.add_row(&mut db, row_data);
+
+        assert_eq!(db.tables[0].rows.len(), 2);
+        assert_eq!(
+            db.tables[0].rows[0].data,
+            json!({"id": "1", "name": "John Doe"})
+        );
+        assert_eq!(
+            db.tables[0].rows[1].data,
+            json!({"id": "2", "name": "Jane Doe"})
+        );
+    }
+
+    #[traced_test]
+    #[test]
+    fn test_table_add_row_table_not_found() {
+        let mut db = setup_temp_db();
+        let mut table = Table::new(
+            "NonExistentTable".to_string(),
+            Columns::new(vec![Column::new("id", true), Column::new("name", true)]),
+        );
+
+        let row_data = json!({"id": "1", "name": "John Doe"});
+        table.add_row(&mut db, row_data);
+
+        assert!(logs_contain("Table NonExistentTable not found"));
+        assert_eq!(db.tables.len(), 1); // Original table remains unchanged
+    }
+
+    #[traced_test]
+    #[test]
+    fn test_table_add_row_save_failure() {
+        let mut db = setup_temp_db();
+        let mut table = Table::new(
+            "TestTable".to_string(),
+            Columns::new(vec![Column::new("id", true), Column::new("name", true)]),
+        );
+        db.add_table(&mut table).unwrap();
+
+        // Simulate failure in saving
+        db.file_name = "/invalid/path.json".to_string();
+        let row_data = json!({"id": "1", "name": "John Doe"});
+        table.add_row(&mut db, row_data);
+
+        assert!(logs_contain("Failed to save to file"));
+    }
 }
