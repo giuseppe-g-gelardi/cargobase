@@ -2,6 +2,9 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use serde_reflection::{ContainerFormat, Named, Tracer, TracerConfig};
+use tracing;
+
+use super::DatabaseError;
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct Column {
@@ -56,30 +59,37 @@ impl Columns {
     }
 
     // validate the columns
-    pub fn validate(&self, row_data: Value) -> Result<(), String> {
+    pub fn validate(&self, row_data: Value) -> Result<(), DatabaseError> {
         if let Value::Object(data) = row_data {
             for column in &self.0 {
                 if column.required && !data.contains_key(&column.name) {
-                    return Err(format!("Column '{}' is required.", column.name));
+                    let error_message = format!("Column '{}' is required.", column.name);
+                    tracing::error!("{}", error_message);
+                    return Err(DatabaseError::ColumnRequiredError(error_message));
                 }
             }
 
             for key in data.keys() {
                 if !self.0.iter().any(|col| col.name == *key) {
-                    return Err(format!("Column '{}' is not valid.", key));
+                    let error_message = format!("Column '{}' is not valid.", key);
+                    tracing::error!("{}", error_message);
+                    return Err(DatabaseError::InvalidData(error_message));
                 }
             }
             Ok(())
         } else {
-            Err("Invalid row data.".to_string())
+            tracing::error!("Invalid row data.");
+            Err(DatabaseError::InvalidData("Invalid row data.".to_string()))
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use serde_json::json;
+    use tracing_test::traced_test;
+
+    use super::*;
 
     #[test]
     fn test_column_new() {
@@ -116,6 +126,7 @@ mod tests {
         assert!(result.is_ok());
     }
 
+    #[traced_test]
     #[test]
     fn test_validate_missing_required_column() {
         let columns = Columns(vec![
@@ -130,10 +141,18 @@ mod tests {
         });
 
         let result = columns.validate(row_data);
+
+        // Assert that an error is returned
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "Column 'name' is required.");
+
+        // Verify the specific log message
+        assert!(
+            logs_contain("Column 'name' is required."),
+            "Expected log message for missing required column not found."
+        );
     }
 
+    #[traced_test]
     #[test]
     fn test_validate_invalid_column() {
         let columns = Columns(vec![
@@ -149,10 +168,18 @@ mod tests {
         });
 
         let result = columns.validate(row_data);
+
+        // Assert that an error is returned
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "Column 'phone' is not valid.");
+
+        // Verify the specific log message
+        assert!(
+            logs_contain("Column 'phone' is not valid."),
+            "Expected log message for invalid column not found."
+        );
     }
 
+    #[traced_test]
     #[test]
     fn test_validate_invalid_row_type() {
         let columns = Columns(vec![
@@ -170,8 +197,15 @@ mod tests {
         ]); // Invalid type (array instead of object)
 
         let result = columns.validate(row_data);
+
+        // Assert that an error is returned
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "Invalid row data.");
+
+        // Verify the specific log message
+        assert!(
+            logs_contain("Invalid row data."),
+            "Expected log message for invalid row data not found."
+        );
     }
 
     #[test]
