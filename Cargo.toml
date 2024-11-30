@@ -22,4 +22,13 @@ default = ["sync", "logging"] # default features
 sync = [] # synchronous features only
 async = ["tokio"] # asynchronous features only
 logging = ["tracing"] # logging via tracing
-full = ["sync", "async", "logging"] # all features
+# TODO encryption = ["???"]
+# TODO compression = ["???"]
+full = [
+"sync", 
+"async", 
+"logging"
+# "encryption",
+# "compression"
+] # all features
+
