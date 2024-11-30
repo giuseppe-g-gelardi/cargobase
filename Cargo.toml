@@ -17,3 +17,9 @@ tracing = "0.1"
 tracing-subscriber = "0.3"
 tracing-test = "0.2.5"
 
+[features]
+default = ["sync", "logging"] # default features
+sync = [] # synchronous features only
+async = ["tokio"] # asynchronous features only
+logging = ["tracing"] # logging via tracing
+full = ["sync", "async", "logging"] # all features
