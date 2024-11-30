@@ -268,21 +268,6 @@ mod tests {
     }
 
     #[test]
-    fn test_query_to() {
-        let query = Query {
-            db_file_name: "test_db.json".to_string(),
-            table_name: None,
-            operation: Operation::Create,
-            update_data: None,
-            row_data: None,
-        };
-
-        // let updated_query = query.to("TestTable");
-        let updated_query = query.from("TestTable");
-        assert_eq!(updated_query.table_name, Some("TestTable".to_string()));
-    }
-
-    #[test]
     fn test_query_data() {
         let query = Query {
             db_file_name: "test_db.json".to_string(),
@@ -367,5 +352,122 @@ mod tests {
         let data = json!({ "name": "Updated Name" });
         let updated_query = query.set(data.clone());
         assert_eq!(updated_query.update_data, Some(data));
+    }
+
+    #[test]
+    fn test_query_where_eq_no_match() {
+        let mut db = setup_temp_db();
+
+        let test_data = TestData {
+            id: "1".to_string(),
+            name: "Alice".to_string(),
+        };
+
+        db.add_row()
+            .from("TestTable")
+            .data_from_struct(test_data)
+            .execute_add()
+            .expect("Failed to add row");
+
+        let result: Option<TestData> = db
+            .get_rows()
+            .from("TestTable")
+            .where_eq("id", "999")
+            .unwrap();
+        assert!(result.is_none(), "Expected no matching record");
+    }
+
+    #[test]
+    fn test_query_where_eq_match() {
+        let mut db = setup_temp_db();
+
+        let test_data = TestData {
+            id: "1".to_string(),
+            name: "Alice".to_string(),
+        };
+
+        db.add_row()
+            .from("TestTable")
+            .data_from_struct(test_data.clone())
+            .execute_add()
+            .expect("Failed to add row");
+
+        let result: Option<TestData> = db.get_rows().from("TestTable").where_eq("id", "1").unwrap();
+        assert_eq!(result, Some(test_data), "Expected matching record");
+    }
+
+    #[test]
+    fn test_query_execute_update() {
+        let mut db = setup_temp_db();
+
+        let test_data = TestData {
+            id: "1".to_string(),
+            name: "Alice".to_string(),
+        };
+
+        db.add_row()
+            .from("TestTable")
+            .data_from_struct(test_data.clone())
+            .execute_add()
+            .expect("Failed to add row");
+
+        let update_data = json!({ "name": "Updated Alice" });
+
+        let result = db
+            .update_row()
+            .from("TestTable")
+            .data(update_data)
+            .where_eq::<TestData>("id", "1")
+            .unwrap();
+
+        assert!(
+            result.is_some(),
+            "Expected update to return the updated record"
+        );
+        assert_eq!(
+            result.unwrap().name,
+            "Updated Alice",
+            "Name was not updated"
+        );
+    }
+
+    #[test]
+    fn test_query_execute_delete() {
+        let mut db = setup_temp_db();
+
+        let test_data = TestData {
+            id: "1".to_string(),
+            name: "Alice".to_string(),
+        };
+
+        db.add_row()
+            .from("TestTable")
+            .data_from_struct(test_data.clone())
+            .execute_add()
+            .expect("Failed to add row");
+
+        let result = db
+            .get_single()
+            .from("TestTable")
+            .where_eq::<TestData>("id", "1")
+            .unwrap();
+
+        assert!(result.is_some(), "Expected record to exist before deletion");
+
+        let _ = db
+            .delete_single()
+            .from("TestTable")
+            .where_eq::<TestData>("id", "1")
+            .unwrap();
+
+        let rows: Vec<TestData> = db.get_rows().from("TestTable").all();
+        let deleted_record = db
+            .get_single()
+            .from("TestTable")
+            .where_eq::<TestData>("id", "1")
+            .unwrap();
+
+        assert!(deleted_record.is_none(), "Expected record to be deleted");
+        assert!(rows.is_empty(), "Expected all records to be deleted");
     }
 }
