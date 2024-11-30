@@ -56,14 +56,6 @@ mod tests {
         assert_eq!(table.columns, columns);
     }
 
-    // #[test]
-    // fn test_table_set_file_name() {
-    //     let columns = Columns::new(vec![Column::new("name", true), Column::new("age", false)]);
-    //     let table = Table::new("users".to_string(), columns.clone());
-    //     // table.set_file_name("db.json".to_string());
-    //     assert_eq!(table.name, "users");
-    // }
-
     #[test]
     fn test_table_add_row_single() {
         let mut db = setup_temp_db();
