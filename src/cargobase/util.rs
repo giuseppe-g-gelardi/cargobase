@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 use tempfile::NamedTempFile;
-// use tracing_subscriber::fmt::Subscriber;
 
 use super::{Columns, Database, Table};
 
@@ -25,14 +24,33 @@ pub fn setup_temp_db() -> Database {
     db
 }
 
-// pub fn init_tracing() {
-//     // let subscriber = fmt::Subscriber::builder()
-//     let subscriber = Subscriber::builder()
-//         .with_max_level(tracing::Level::WARN)
-//         .finish();
-//     /*
-//     example implementation:
-//     info!(target: "cargobase", "Database `{name}` already exists, loading...");
-//     */
-//     tracing::subscriber::set_global_default(subscriber).expect("Failed to set subscriber");
-// }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    #[test]
+    fn test_setup_temp_db() {
+        let db = setup_temp_db();
+        assert_eq!(db.tables.len(), 1);
+        assert_eq!(db.tables[0].name, "TestTable");
+    }
+
+    #[test]
+    fn test_temp_file_cleanup() {
+        // Create a temporary database
+        let temp_file = NamedTempFile::new().expect("Failed to create a temporary file");
+        let db_path = temp_file.path().to_str().unwrap().to_string();
+
+        // Drop the file explicitly by dropping the `NamedTempFile` instance
+        drop(temp_file);
+
+        // Verify that the temporary file is removed
+        let file_exists = fs::metadata(&db_path).is_ok();
+        assert!(
+            !file_exists,
+            "Temporary file `{}` should have been removed after being dropped",
+            db_path
+        );
+    }
+}
