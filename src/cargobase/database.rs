@@ -17,9 +17,6 @@ impl Database {
         let name = name.to_string();
         let file_name = format!("{name}.json");
 
-        // find a better way of logging this information for the end user
-        // -- they might not have tracing enabled
-
         if std::path::Path::new(&file_name).exists() {
             tracing::info!("Database already exists: {name}, loading database");
 
@@ -99,8 +96,7 @@ impl Database {
     }
 
     #[cfg(feature = "async")]
-    // pub(crate) async fn save_to_file_async(&self) -> Result<(), std::io::Error> {
-    pub(crate) async fn save_to_file_async(&self) -> Result<(), DatabaseError> {
+    pub(crate) async fn save_to_file_async(&self) -> Result<(), tokio::io::Error> {
         let json_data = serde_json::to_string_pretty(&self)?;
         tokio::fs::write(&self.file_name, json_data).await?;
         tracing::info!("Database saved to file: {}", self.file_name);
@@ -110,18 +106,36 @@ impl Database {
     pub(crate) fn load_from_file(file_name: &str) -> Result<Self, std::io::Error> {
         let json_data = std::fs::read_to_string(file_name)?;
         let db: Database = serde_json::from_str(&json_data)?;
-        tracing::info!("Database loaded from file: {}", file_name); // needed?
+        tracing::info!("Database loaded from file: {}", file_name);
         Ok(db)
     }
 
+    // updated load from file method
+    // pub(crate) fn load_from_file_instance(&mut self) -> Result<(), std::io::Error> {
+    //     let json_data = std::fs::read_to_string(&self.file_name)?;
+    //     let db: Database = serde_json::from_str(&json_data)?;
+    //     tracing::info!("Database loaded from file: {}", self.file_name);
+    //     self.tables = db.tables;
+    //     Ok(())
+    // }
+
     #[cfg(feature = "async")]
-    // pub(crate) async fn load_from_file_async(file_name: &str) -> Result<(), std::io::Error> {
-    pub(crate) async fn load_from_file_async(file_name: &str) -> Result<(), DatabaseError> {
+    pub(crate) async fn load_from_file_async(file_name: &str) -> Result<Self, tokio::io::Error> {
         let json_data = tokio::fs::read_to_string(file_name).await?;
         let db: Database = serde_json::from_str(&json_data)?;
-        tracing::info!("Database loaded from file: {}", file_name); // needed?
+        tracing::info!("Database loaded from file: {}", file_name);
         Ok(db)
     }
+
+    // async version of the load from file instance method
+    // #[cfg(feature = "async")]
+    // pub(crate) async fn load_from_file_instance_async(&mut self) -> Result<(), DatabaseError> {
+    //     let json_data = tokio::fs::read_to_string(&self.file_name).await?;
+    //     let db: Database = serde_json::from_str(&json_data)?;
+    //     tracing::info!("Database loaded from file: {}", self.file_name);
+    //     self.tables = db.tables;
+    //     Ok(())
+    // }
 
     pub(crate) fn get_table_mut(&mut self, table_name: &str) -> Option<&mut Table> {
         self.tables.iter_mut().find(|t| t.name == table_name)
@@ -290,6 +304,23 @@ mod tests {
         assert_eq!(db.tables.len(), 1);
     }
 
+    #[test]
+    fn test_save_to_file() {
+        let db = setup_temp_db();
+        let result = db.save_to_file();
+
+        assert!(result.is_ok());
+        assert!(std::path::Path::new(&db.file_name).exists());
+    }
+
+    #[test]
+    fn test_load_from_file() {
+        let db = setup_temp_db();
+        let loaded_db = Database::load_from_file(&db.file_name).expect("Failed to load database");
+
+        assert_eq!(db, loaded_db);
+    }
+
     #[cfg(feature = "async")]
     #[tokio::test]
     async fn test_save_to_file_async() {
@@ -300,14 +331,14 @@ mod tests {
 
         let db = Database {
             name: "test_db".to_string(),
-            file_name: db_path.to_clone(),
+            file_name: db_path.clone(),
             tables: vec![],
         };
 
         db.save_to_file_async()
             .await
             .expect("Failed to save database");
-        let loaded_db = Database::load_from_file(&file_path).expect("Failed to load database");
+        let loaded_db = Database::load_from_file(&db_path).expect("Failed to load database");
         assert_eq!(db, loaded_db);
     }
 
@@ -329,7 +360,7 @@ mod tests {
             .await
             .expect("Failed to save database");
 
-        let loaded_db = Database::load_from_file_async("test_db.json")
+        let loaded_db = Database::load_from_file_async(&db_path)
             .await
             .expect("Failed to load database");
 

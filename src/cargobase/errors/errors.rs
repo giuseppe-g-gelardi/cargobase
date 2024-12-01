@@ -33,10 +33,10 @@ pub enum DatabaseError {
     #[error("")] // could expand to specify serialization/deserialization error
     JSONError(#[from] serde_json::Error),
 
-    #[error("IO error: `{0}`")]
-    Io(#[from] std::io::Error),
-
-    #[cfg(feature = "async")]
-    #[error("Tokio IO error: `{0}`")]
-    TokioIo(#[from] tokio::io::Error),
+    // #[error("IO error: `{0}`")]
+    // Io(#[from] std::io::Error),
+    //
+    // #[cfg(feature = "async")]
+    // #[error("Tokio IO error: `{0}`")]
+    // TokioIo(#[from] tokio::io::Error),
 }
