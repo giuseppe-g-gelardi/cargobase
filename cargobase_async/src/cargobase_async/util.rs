@@ -22,9 +22,7 @@ pub async fn setup_temp_db() -> Database {
     let mut table = Table::new("TestTable".to_string(), test_columns);
     db.add_table(&mut table).await.unwrap();
 
-    db.save_to_file()
-        .await
-        .expect("Failed to save database");
+    db.save_to_file().await.expect("Failed to save database");
 
     db
 }

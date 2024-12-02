@@ -45,8 +45,8 @@ impl Table {
 #[cfg(test)]
 mod tests {
     use super::super::setup_temp_db;
-    use cargobase_core::{Column, Columns};
     use super::*;
+    use cargobase_core::{Column, Columns};
 
     use serde_json::json;
     use tracing_test::traced_test;
@@ -69,7 +69,7 @@ mod tests {
         db.add_table(&mut table).await.unwrap();
 
         let row_data = json!({"id": "1", "name": "John Doe"});
-        table.add_row(&mut db, row_data);
+        table.add_row(&mut db, row_data).await;
 
         assert_eq!(db.tables[0].rows.len(), 1);
         assert_eq!(
@@ -91,7 +91,7 @@ mod tests {
             {"id": "1", "name": "John Doe"},
             {"id": "2", "name": "Jane Doe"}
         ]);
-        table.add_row(&mut db, row_data);
+        table.add_row(&mut db, row_data).await;
 
         assert_eq!(db.tables[0].rows.len(), 2);
         assert_eq!(
@@ -114,7 +114,7 @@ mod tests {
         );
 
         let row_data = json!({"id": "1", "name": "John Doe"});
-        table.add_row(&mut db, row_data);
+        table.add_row(&mut db, row_data).await;
 
         assert!(logs_contain("Table NonExistentTable not found"));
         assert_eq!(db.tables.len(), 1); // Original table remains unchanged
@@ -133,7 +133,7 @@ mod tests {
         // Simulate failure in saving
         db.file_name = "/invalid/path.json".to_string();
         let row_data = json!({"id": "1", "name": "John Doe"});
-        table.add_row(&mut db, row_data);
+        table.add_row(&mut db, row_data).await;
 
         assert!(logs_contain("Failed to save to file"));
     }
