@@ -1,8 +1,8 @@
 [workspace]
 members = [
     "cargobase",
-    "cargobase-async",
-    "cargobase-core"
+    "cargobase_async",
+    "cargobase_core"
 ]
 # [package]
 # name = "cargobase"
@@ -14,6 +14,7 @@ serde = { version = "1.0.215", features = ["derive"] }
 serde_json = { version = "1.0.132", features = ["raw_value"] }
 serde_derive = "1.0.188"
 # base64 = "0.22.1"
+tokio = { version = "1", features = ["full"]}
 # tokio = { version = "1", features = ["full"], optional = true}
 uuid = {version ="1.11.0", features = ["v4"] }
 thiserror = "2.0.3"
