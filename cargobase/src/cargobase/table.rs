@@ -2,9 +2,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tracing;
 
-use super::{Columns, Database};
+use super::Database;
 
-use cargobase_core::Row;
+use cargobase_core::{Columns, Row};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct Table {
@@ -44,7 +44,8 @@ impl Table {
 
 #[cfg(test)]
 mod tests {
-    use super::super::{setup_temp_db, Column, Columns};
+    use super::super::setup_temp_db;
+    use cargobase_core::{Column, Columns};
     use super::*;
 
     use serde_json::json;

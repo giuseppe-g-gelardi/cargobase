@@ -2,8 +2,9 @@ use serde::{Deserialize, Serialize};
 use tracing;
 
 use super::view::View;
-use super::DatabaseError;
 use super::{query::Operation, Query, Table};
+
+use cargobase_core::DatabaseError;
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct Database {
@@ -216,7 +217,9 @@ mod tests {
 
     use super::*;
     use crate::cargobase::setup_temp_db;
-    use crate::{Columns, Table};
+    use crate::Table;
+
+    use cargobase_core::Columns;
 
     // #[cfg(feature = "async")]
     // use crate::cargobase::setup_temp_db_async;

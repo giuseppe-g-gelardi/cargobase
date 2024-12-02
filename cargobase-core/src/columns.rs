@@ -2,14 +2,14 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use serde_reflection::{ContainerFormat, Named, Tracer, TracerConfig};
-// use tracing;
 
+use tracing;
 use super::DatabaseError;
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct Column {
-    pub(crate) name: String,
-    pub(crate) required: bool,
+    pub name: String,
+    pub required: bool,
 }
 
 impl Column {

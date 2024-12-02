@@ -1,3 +1,3 @@
 pub mod cargobase;
 
-pub use cargobase::{Column, Columns, Database, Table};
+pub use cargobase::{Database, Table};

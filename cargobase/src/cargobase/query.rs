@@ -2,9 +2,9 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use super::{Database, DatabaseError, Table};
+use super::{Database, Table};
 
-use cargobase_core::Row;
+use cargobase_core::{DatabaseError, Row};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Copy)]
 pub enum Operation {

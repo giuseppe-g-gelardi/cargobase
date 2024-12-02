@@ -1,7 +1,9 @@
 use serde::{Deserialize, Serialize};
 use tempfile::NamedTempFile;
 
-use super::{Columns, Database, Table};
+use super::{Database, Table};
+
+use cargobase_core::Columns;
 
 // #[cfg(feature = "async")]
 // use tokio::fs;
