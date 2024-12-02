@@ -16,5 +16,5 @@ pub use table::Table;
 pub use util::setup_temp_db;
 pub use view::View;
 
-#[cfg(feature = "async")]
-pub use util::setup_temp_db_async;
+// #[cfg(feature = "async")]
+// pub use util::setup_temp_db_async;

@@ -8,20 +8,20 @@ members = [
 # version = "0.1.1"
 # edition = "2021"
 #
-# [dependencies]
-# serde = { version = "1.0.215", features = ["derive"] }
-# serde_json = { version = "1.0.132", features = ["raw_value"] }
-# serde_derive = "1.0.188"
-# base64 = "0.22.1"
+[workspace.dependencies]
+serde = { version = "1.0.215", features = ["derive"] }
+serde_json = { version = "1.0.132", features = ["raw_value"] }
+serde_derive = "1.0.188"
+base64 = "0.22.1"
 # tokio = { version = "1", features = ["full"], optional = true}
-# uuid = {version ="1.11.0", features = ["v4"] }
-# thiserror = "2.0.3"
-# tempfile = "3.14.0"
-# serde-reflection = "0.4.0"
-# tracing = "0.1"
-# tracing-subscriber = "0.3"
-# tracing-test = "0.2.5"
-#
+uuid = {version ="1.11.0", features = ["v4"] }
+thiserror = "2.0.3"
+tempfile = "3.14.0"
+serde-reflection = "0.4.0"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+tracing-test = "0.2.5"
+
 # [features]
 # default = ["sync", "async"] # for development
 # # default = ["sync"]

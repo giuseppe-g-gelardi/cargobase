@@ -1,0 +1,14 @@
+[package]
+name = "cargobase-async"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+cargobase = { path = "../cargobase" } # Dependency on the core crate
+tokio = { version = "1", features = ["full"] }
+async-trait = "0.1"
+
+# Optional: Features specific to async crate
+[features]
+default = []
+
