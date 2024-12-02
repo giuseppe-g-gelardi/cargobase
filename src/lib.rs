@@ -1,3 +1,3 @@
 pub mod cargobase;
 
-pub use cargobase::{Columns, Column, Row, Database, Table, util::init_tracing};
+pub use cargobase::{Column, Columns, Database, Row, Table};

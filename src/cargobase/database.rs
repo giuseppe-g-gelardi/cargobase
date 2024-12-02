@@ -17,9 +17,6 @@ impl Database {
         let name = name.to_string();
         let file_name = format!("{name}.json");
 
-        // find a better way of logging this information for the end user
-        // -- they might not have tracing enabled
-
         if std::path::Path::new(&file_name).exists() {
             tracing::info!("Database already exists: {name}, loading database");
 
@@ -44,15 +41,42 @@ impl Database {
         }
     }
 
+    #[cfg(feature = "async")]
+    pub async fn new_async(name: &str) -> Self {
+        let name = name.to_string();
+        let file_name = format!("{name}.json");
+
+        if tokio::fs::metadata(&file_name).await.is_ok() {
+            tracing::info!("Database already exists: {name}, loading database");
+
+            // Load the database from the file
+            match Database::load_from_file_async(&file_name).await {
+                Ok(db) => return db,
+                Err(e) => {
+                    tracing::error!("Failed to load database from file: {file_name}, error: {e}");
+                }
+            }
+        } else {
+            tracing::info!("Creating new database: {file_name}");
+            // Create an empty JSON file for the new database
+            if let Err(e) = tokio::fs::write(&file_name, "{}").await {
+                tracing::error!("Failed to create database file: {e}");
+            }
+        }
+
+        Database {
+            name,
+            file_name,
+            tables: Vec::new(),
+        }
+    }
+
     pub fn drop_database(&self) -> Result<(), DatabaseError> {
         if std::fs::remove_file(&self.file_name).is_err() {
             tracing::error!(
                 "{}",
                 DatabaseError::DeleteError("Failed to delete database file".to_string())
             );
-
-            // should we crash the program?
-            // return Err(DatabaseError::DeleteError("Failed to delete database file".to_string(),));
         }
 
         tracing::info!("Database `{}` dropped successfully", self.name);
@@ -98,10 +122,26 @@ impl Database {
         Ok(())
     }
 
+    #[cfg(feature = "async")]
+    pub(crate) async fn save_to_file_async(&self) -> Result<(), tokio::io::Error> {
+        let json_data = serde_json::to_string_pretty(&self)?;
+        tokio::fs::write(&self.file_name, json_data).await?;
+        tracing::info!("Database saved to file: {}", self.file_name);
+        Ok(())
+    }
+
     pub(crate) fn load_from_file(file_name: &str) -> Result<Self, std::io::Error> {
         let json_data = std::fs::read_to_string(file_name)?;
         let db: Database = serde_json::from_str(&json_data)?;
-        tracing::info!("Database loaded from file: {}", file_name); // needed?
+        tracing::info!("Database loaded from file: {}", file_name);
+        Ok(db)
+    }
+
+    #[cfg(feature = "async")]
+    pub(crate) async fn load_from_file_async(file_name: &str) -> Result<Self, tokio::io::Error> {
+        let json_data = tokio::fs::read_to_string(file_name).await?;
+        let db: Database = serde_json::from_str(&json_data)?;
+        tracing::info!("Database loaded from file: {}", file_name);
         Ok(db)
     }
 
@@ -178,6 +218,9 @@ mod tests {
     use crate::cargobase::setup_temp_db;
     use crate::{Columns, Table};
 
+    #[cfg(feature = "async")]
+    use crate::cargobase::setup_temp_db_async;
+
     #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
     struct TestData {
         id: String,
@@ -187,6 +230,19 @@ mod tests {
     #[test]
     fn test_database_new() {
         let db = setup_temp_db();
+
+        let db_name = &db.name.to_string();
+        let fnn = format!("{db_name}.json");
+
+        assert_eq!(db.name, db_name.to_string());
+        assert_eq!(db.file_name, fnn);
+        assert_eq!(db.tables.len(), 1); // the setup_temp_db function adds a table
+    }
+
+    #[cfg(feature = "async")]
+    #[tokio::test]
+    async fn test_database_new_async() {
+        let db = setup_temp_db_async().await;
 
         let db_name = &db.name.to_string();
         let fnn = format!("{db_name}.json");
@@ -270,5 +326,68 @@ mod tests {
 
         // Ensure no tables were removed
         assert_eq!(db.tables.len(), 1);
+    }
+
+    #[test]
+    fn test_save_to_file() {
+        let db = setup_temp_db();
+        let result = db.save_to_file();
+
+        assert!(result.is_ok());
+        assert!(std::path::Path::new(&db.file_name).exists());
+    }
+
+    #[test]
+    fn test_load_from_file() {
+        let db = setup_temp_db();
+        let loaded_db = Database::load_from_file(&db.file_name).expect("Failed to load database");
+
+        assert_eq!(db, loaded_db);
+    }
+
+    #[cfg(feature = "async")]
+    #[tokio::test]
+    async fn test_save_to_file_async() {
+        use tempfile::NamedTempFile;
+
+        let temp_file = NamedTempFile::new().expect("Failed to create a temporary file");
+        let db_path = temp_file.path().to_str().unwrap().to_string();
+
+        let db = Database {
+            name: "test_db".to_string(),
+            file_name: db_path.clone(),
+            tables: vec![],
+        };
+
+        db.save_to_file_async()
+            .await
+            .expect("Failed to save database");
+        let loaded_db = Database::load_from_file(&db_path).expect("Failed to load database");
+        assert_eq!(db, loaded_db);
+    }
+
+    #[cfg(feature = "async")]
+    #[tokio::test]
+    async fn test_load_from_file_async() {
+        use tempfile::NamedTempFile;
+
+        let temp_file = NamedTempFile::new().expect("Failed to create a temporary file");
+        let db_path = temp_file.path().to_str().unwrap().to_string();
+
+        let db = Database {
+            name: "test_db".to_string(),
+            file_name: db_path.to_string(),
+            tables: vec![],
+        };
+
+        db.save_to_file_async()
+            .await
+            .expect("Failed to save database");
+
+        let loaded_db = Database::load_from_file_async(&db_path)
+            .await
+            .expect("Failed to load database");
+
+        assert_eq!(db, loaded_db);
     }
 }
