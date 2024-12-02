@@ -20,8 +20,8 @@ cargobase-async.json
 src/cargobase/cargobase.json
 src/cargobase-async/cargobase-async.json
 
-src/cargobase/main.rs
-src/cargobase-async/main.rs
+cargobase/src/main.rs
+cargobase-async/src/main.rs 
 
 .env
 
