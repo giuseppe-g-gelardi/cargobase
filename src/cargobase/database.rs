@@ -47,9 +47,6 @@ impl Database {
                 "{}",
                 DatabaseError::DeleteError("Failed to delete database file".to_string())
             );
-
-            // should we crash the program?
-            // return Err(DatabaseError::DeleteError("Failed to delete database file".to_string(),));
         }
 
         tracing::info!("Database `{}` dropped successfully", self.name);
@@ -110,15 +107,6 @@ impl Database {
         Ok(db)
     }
 
-    // updated load from file method
-    // pub(crate) fn load_from_file_instance(&mut self) -> Result<(), std::io::Error> {
-    //     let json_data = std::fs::read_to_string(&self.file_name)?;
-    //     let db: Database = serde_json::from_str(&json_data)?;
-    //     tracing::info!("Database loaded from file: {}", self.file_name);
-    //     self.tables = db.tables;
-    //     Ok(())
-    // }
-
     #[cfg(feature = "async")]
     pub(crate) async fn load_from_file_async(file_name: &str) -> Result<Self, tokio::io::Error> {
         let json_data = tokio::fs::read_to_string(file_name).await?;
@@ -126,16 +114,6 @@ impl Database {
         tracing::info!("Database loaded from file: {}", file_name);
         Ok(db)
     }
-
-    // async version of the load from file instance method
-    // #[cfg(feature = "async")]
-    // pub(crate) async fn load_from_file_instance_async(&mut self) -> Result<(), DatabaseError> {
-    //     let json_data = tokio::fs::read_to_string(&self.file_name).await?;
-    //     let db: Database = serde_json::from_str(&json_data)?;
-    //     tracing::info!("Database loaded from file: {}", self.file_name);
-    //     self.tables = db.tables;
-    //     Ok(())
-    // }
 
     pub(crate) fn get_table_mut(&mut self, table_name: &str) -> Option<&mut Table> {
         self.tables.iter_mut().find(|t| t.name == table_name)
