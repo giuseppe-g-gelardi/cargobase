@@ -2,7 +2,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tracing;
 
-use super::{Columns, Database, Row};
+use super::{Columns, Database};
+
+use cargobase_core::Row;
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct Table {

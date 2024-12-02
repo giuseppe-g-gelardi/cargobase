@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 cargobase = { path = "../cargobase" } # Dependency on the core crate
+cargobase-core = { path = "../cargobase-core" } # Dependency on the core crate
 tokio = { version = "1", features = ["full"] }
 async-trait = "0.1"
 
