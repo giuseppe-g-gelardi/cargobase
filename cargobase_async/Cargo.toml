@@ -1,0 +1,25 @@
+[package]
+name = "cargobase_async"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+cargobase = { path = "../cargobase" } # Dependency on the core crate
+cargobase_core = { path = "../cargobase_core" } # Dependency on the core crate
+
+tempfile = { workspace = true }
+serde-reflection = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+tracing-test = { workspace = true }
+serde = { workspace = true } 
+serde_json = { workspace = true }
+uuid = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+# async-trait = { workspace = true }
+
+# Optional: Features specific to async crate
+[features]
+default = []
+
