@@ -41,6 +41,36 @@ impl Database {
         }
     }
 
+    #[cfg(feature = "async")]
+    pub async fn new_async(name: &str) -> Self {
+        let name = name.to_string();
+        let file_name = format!("{name}.json");
+
+        if tokio::fs::metadata(&file_name).await.is_ok() {
+            tracing::info!("Database already exists: {name}, loading database");
+
+            // Load the database from the file
+            match Database::load_from_file_async(&file_name).await {
+                Ok(db) => return db,
+                Err(e) => {
+                    tracing::error!("Failed to load database from file: {file_name}, error: {e}");
+                }
+            }
+        } else {
+            tracing::info!("Creating new database: {file_name}");
+            // Create an empty JSON file for the new database
+            if let Err(e) = tokio::fs::write(&file_name, "{}").await {
+                tracing::error!("Failed to create database file: {e}");
+            }
+        }
+
+        Database {
+            name,
+            file_name,
+            tables: Vec::new(),
+        }
+    }
+
     pub fn drop_database(&self) -> Result<(), DatabaseError> {
         if std::fs::remove_file(&self.file_name).is_err() {
             tracing::error!(
@@ -188,6 +218,9 @@ mod tests {
     use crate::cargobase::setup_temp_db;
     use crate::{Columns, Table};
 
+    #[cfg(feature = "async")]
+    use crate::cargobase::setup_temp_db_async;
+
     #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
     struct TestData {
         id: String,
@@ -197,6 +230,19 @@ mod tests {
     #[test]
     fn test_database_new() {
         let db = setup_temp_db();
+
+        let db_name = &db.name.to_string();
+        let fnn = format!("{db_name}.json");
+
+        assert_eq!(db.name, db_name.to_string());
+        assert_eq!(db.file_name, fnn);
+        assert_eq!(db.tables.len(), 1); // the setup_temp_db function adds a table
+    }
+
+    #[cfg(feature = "async")]
+    #[tokio::test]
+    async fn test_database_new_async() {
+        let db = setup_temp_db_async().await;
 
         let db_name = &db.name.to_string();
         let fnn = format!("{db_name}.json");
