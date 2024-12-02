@@ -22,7 +22,7 @@ impl Table {
         }
     }
 
-    pub fn add_row(&mut self, db: &mut Database, data: Value) {
+    pub async fn add_row(&mut self, db: &mut Database, data: Value) {
         if let Some(table) = db.get_table_mut(&self.name) {
             if data.is_array() {
                 if let Some(array) = data.as_array() {
@@ -33,7 +33,7 @@ impl Table {
             } else {
                 table.rows.push(Row::new(data))
             }
-            let _ = db.save_to_file().map_err(|e| {
+            let _ = db.save_to_file().await.map_err(|e| {
                 tracing::error!("Failed to save to file: {}", e);
             });
         } else {
@@ -59,14 +59,14 @@ mod tests {
         assert_eq!(table.columns, columns);
     }
 
-    #[test]
-    fn test_table_add_row_single() {
-        let mut db = setup_temp_db();
+    #[tokio::test]
+    async fn test_table_add_row_single() {
+        let mut db = setup_temp_db().await;
         let mut table = Table::new(
             "TestTable".to_string(),
             Columns::new(vec![Column::new("id", true), Column::new("name", true)]),
         );
-        db.add_table(&mut table).unwrap();
+        db.add_table(&mut table).await.unwrap();
 
         let row_data = json!({"id": "1", "name": "John Doe"});
         table.add_row(&mut db, row_data);
@@ -78,14 +78,14 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_table_add_row_array() {
-        let mut db = setup_temp_db();
+    #[tokio::test]
+    async fn test_table_add_row_array() {
+        let mut db = setup_temp_db().await;
         let mut table = Table::new(
             "TestTable".to_string(),
             Columns::new(vec![Column::new("id", true), Column::new("name", true)]),
         );
-        db.add_table(&mut table).unwrap();
+        db.add_table(&mut table).await.unwrap();
 
         let row_data = json!([
             {"id": "1", "name": "John Doe"},
@@ -105,9 +105,9 @@ mod tests {
     }
 
     #[traced_test]
-    #[test]
-    fn test_table_add_row_table_not_found() {
-        let mut db = setup_temp_db();
+    #[tokio::test]
+    async fn test_table_add_row_table_not_found() {
+        let mut db = setup_temp_db().await;
         let mut table = Table::new(
             "NonExistentTable".to_string(),
             Columns::new(vec![Column::new("id", true), Column::new("name", true)]),
@@ -121,14 +121,14 @@ mod tests {
     }
 
     #[traced_test]
-    #[test]
-    fn test_table_add_row_save_failure() {
-        let mut db = setup_temp_db();
+    #[tokio::test]
+    async fn test_table_add_row_save_failure() {
+        let mut db = setup_temp_db().await;
         let mut table = Table::new(
             "TestTable".to_string(),
             Columns::new(vec![Column::new("id", true), Column::new("name", true)]),
         );
-        db.add_table(&mut table).unwrap();
+        db.add_table(&mut table).await.unwrap();
 
         // Simulate failure in saving
         db.file_name = "/invalid/path.json".to_string();
