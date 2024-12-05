@@ -3,9 +3,6 @@ use tempfile::NamedTempFile;
 
 use super::{Columns, Database, Table};
 
-// #[cfg(feature = "async")]
-// use tokio::fs;
-
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 struct TestData {
     id: String,
@@ -100,7 +97,7 @@ mod tests {
         drop(temp_file);
 
         // Verify that the temporary file is removed
-        let file_exists = fs::metadata(&db_path).is_ok();
+        let file_exists = tokio::fs::metadata(&db_path).await.is_ok();
         assert!(
             !file_exists,
             "Temporary file `{}` should have been removed after being dropped",

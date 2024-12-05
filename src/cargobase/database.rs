@@ -83,6 +83,19 @@ impl Database {
         Ok(())
     }
 
+    #[cfg(feature = "async")]
+    pub async fn drop_database_async(&self) -> Result<(), DatabaseError> {
+        if tokio::fs::remove_file(&self.file_name).await.is_err() {
+            tracing::error!(
+                "{}",
+                DatabaseError::DeleteError("Failed to delete database file".to_string())
+            );
+        }
+
+        tracing::info!("Database `{}` dropped successfully", self.name);
+        Ok(())
+    }
+
     pub fn add_table(&mut self, table: &mut Table) -> Result<(), DatabaseError> {
         if self.tables.iter().any(|t| t.name == table.name) {
             tracing::warn!(
@@ -94,6 +107,23 @@ impl Database {
 
         self.tables.push(table.clone());
         self.save_to_file()
+            .map_err(|e| DatabaseError::SaveError(e))?;
+        Ok(())
+    }
+
+    #[cfg(feature = "async")]
+    pub async fn add_table_async(&mut self, table: &mut Table) -> Result<(), DatabaseError> {
+        if self.tables.iter().any(|t| t.name == table.name) {
+            tracing::warn!(
+                "{}",
+                DatabaseError::TableAlreadyExists(table.name.to_string())
+            );
+            return Ok(());
+        }
+
+        self.tables.push(table.clone());
+        self.save_to_file_async()
+            .await
             .map_err(|e| DatabaseError::SaveError(e))?;
         Ok(())
     }
@@ -114,6 +144,48 @@ impl Database {
             Ok(())
         }
     }
+
+    #[cfg(feature = "async")]
+    pub async fn drop_table_async(&mut self, table_name: &str) -> Result<(), DatabaseError> {
+        let mut db = Database::load_from_file_async(&self.file_name)
+            .await
+            .map_err(|e| DatabaseError::LoadError(e))?;
+
+        if let Some(index) = db.tables.iter().position(|t| t.name == table_name) {
+            let removed_table = db.tables.remove(index);
+            tracing::info!("Table `{}` dropped successfully", removed_table.name);
+            db.save_to_file_async()
+                .await
+                .map_err(|e| DatabaseError::SaveError(e))?;
+
+            self.tables = db.tables;
+            Ok(())
+        } else {
+            tracing::error!("{}", DatabaseError::TableNotFound(table_name.to_string()));
+            Ok(())
+        }
+    }
+
+    /// this implements the new instance method
+    // pub fn drop_table(&mut self, table_name: &str) -> Result<(), DatabaseError> {
+    //     // Load data into the current instance
+    //     self.load_from_file_instance()
+    //         .map_err(|e| DatabaseError::LoadError(e))?;
+    //
+    //     // Find and remove the table
+    //     if let Some(index) = self.tables.iter().position(|t| t.name == table_name) {
+    //         let removed_table = self.tables.remove(index);
+    //         tracing::info!("Table `{}` dropped successfully", removed_table.name);
+    //
+    //         // Save the updated database
+    //         self.save_to_file()
+    //             .map_err(|e| DatabaseError::SaveError(e))?;
+    //         Ok(())
+    //     } else {
+    //         tracing::error!("{}", DatabaseError::TableNotFound(table_name.to_string()));
+    //         Ok(())
+    //     }
+    // }
 
     pub(crate) fn save_to_file(&self) -> Result<(), std::io::Error> {
         let json_data = serde_json::to_string_pretty(&self)?;
@@ -144,6 +216,29 @@ impl Database {
         tracing::info!("Database loaded from file: {}", file_name);
         Ok(db)
     }
+
+    // pub(crate) fn load_from_file_instance(&mut self) -> Result<(), std::io::Error> {
+    //     let json_data = std::fs::read_to_string(&self.file_name)?;
+    //     let db: Database = serde_json::from_str(&json_data)?;
+    //     tracing::info!("Database loaded from file: {}", self.file_name);
+    //
+    //     // Update the current instance with loaded data
+    //     self.name = db.name;
+    //     self.tables = db.tables;
+    //     Ok(())
+    // }
+    //
+    // #[cfg(feature = "async")]
+    // pub(crate) async fn load_from_file_instance_async(&mut self) -> Result<(), tokio::io::Error> {
+    //     let json_data = tokio::fs::read_to_string(&self.file_name).await?;
+    //     let db: Database = serde_json::from_str(&json_data)?;
+    //     tracing::info!("Database loaded from file: {}", self.file_name);
+    //
+    //     // Update the current instance with loaded data
+    //     self.name = db.name;
+    //     self.tables = db.tables;
+    //     Ok(())
+    // }
 
     pub(crate) fn get_table_mut(&mut self, table_name: &str) -> Option<&mut Table> {
         self.tables.iter_mut().find(|t| t.name == table_name)
@@ -261,6 +356,16 @@ mod tests {
         assert!(!std::path::Path::new(&db.file_name).exists());
     }
 
+    #[cfg(feature = "async")]
+    #[tokio::test]
+    async fn test_drop_database_async() {
+        let db = setup_temp_db_async().await;
+        let result = db.drop_database_async().await;
+
+        assert!(result.is_ok());
+        assert!(!std::path::Path::new(&db.file_name).exists());
+    }
+
     #[test]
     fn test_add_table_success() {
         // this test does not use the setup_temp_db function
@@ -279,6 +384,25 @@ mod tests {
 
         // remove the test_db.json file after testing
         std::fs::remove_file("test_db.json").ok();
+    }
+
+    #[cfg(feature = "async")]
+    #[tokio::test]
+    async fn test_add_table_success_async() {
+        // this test does not use the setup_temp_db function
+        // because it needs to test the creation of a new database and table
+        tokio::fs::remove_file("test_db.json").await.ok();
+        let mut db = Database::new_async("test_db").await;
+        let test_columns = Columns::from_struct::<TestData>(true);
+        let mut test_table = Table::new("TestTable".to_string(), test_columns);
+
+        let result = db.add_table_async(&mut test_table).await;
+
+        assert!(result.is_ok());
+        assert_eq!(db.tables.len(), 1);
+        assert_eq!(db.tables[0].name, "TestTable");
+
+        tokio::fs::remove_file("test_db.json").await.ok();
     }
 
     #[traced_test]
@@ -302,10 +426,41 @@ mod tests {
         assert!(logs, "Expected warning log for existing table not found.");
     }
 
+    #[traced_test]
+    #[tokio::test]
+    async fn test_add_table_already_exists_async() {
+        let mut db = setup_temp_db_async().await;
+
+        // Create a duplicate table
+        let columns = Columns::from_struct::<TestData>(true);
+        let mut duplicate_table = Table::new("TestTable".to_string(), columns);
+        let result = db.add_table_async(&mut duplicate_table).await;
+
+        // Assert that the result is Ok(()) even when the table already exists
+        assert!(result.is_ok());
+
+        // Ensure no duplicate tables exist
+        assert_eq!(db.tables.len(), 1);
+
+        let db_error = DatabaseError::TableAlreadyExists("TestTable".to_string());
+        let logs = logs_contain(&format!("{}", db_error));
+        assert!(logs, "Expected warning log for existing table not found.");
+    }
+
     #[test]
     fn test_drop_table_success() {
         let mut db = setup_temp_db();
         let result = db.drop_table("TestTable");
+
+        assert!(result.is_ok());
+        assert_eq!(db.tables.len(), 0);
+    }
+
+    #[cfg(feature = "async")]
+    #[tokio::test]
+    async fn test_drop_table_success_async() {
+        let mut db = setup_temp_db_async().await;
+        let result = db.drop_table_async("TestTable").await;
 
         assert!(result.is_ok());
         assert_eq!(db.tables.len(), 0);
@@ -316,6 +471,23 @@ mod tests {
     fn test_drop_table_not_found() {
         let mut db = setup_temp_db();
         let result = db.drop_table("NonExistentTable");
+
+        assert!(result.is_ok());
+
+        // Assert that an error is returned
+        let db_error = DatabaseError::TableNotFound("NonExistentTable".to_string());
+        let logs = logs_contain(&format!("{}", db_error));
+        assert!(logs, "Expected error log for non-existent table not found.");
+
+        // Ensure no tables were removed
+        assert_eq!(db.tables.len(), 1);
+    }
+
+    #[traced_test]
+    #[tokio::test]
+    async fn test_drop_table_not_found_async() {
+        let mut db = setup_temp_db_async().await;
+        let result = db.drop_table_async("NonExistentTable").await;
 
         assert!(result.is_ok());
 

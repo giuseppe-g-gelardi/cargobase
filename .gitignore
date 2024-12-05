@@ -21,7 +21,7 @@ Cargo.lock
 #.idea/
 
 cargobase.json
-test.json
+cargobase-async.json
 
 src/main.rs
 
