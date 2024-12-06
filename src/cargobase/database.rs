@@ -162,27 +162,6 @@ impl Database {
         }
     }
 
-    /// this implements the new instance method
-    // pub fn drop_table(&mut self, table_name: &str) -> Result<(), DatabaseError> {
-    //     // Load data into the current instance
-    //     self.load_from_file_instance()
-    //         .map_err(|e| DatabaseError::LoadError(e))?;
-    //
-    //     // Find and remove the table
-    //     if let Some(index) = self.tables.iter().position(|t| t.name == table_name) {
-    //         let removed_table = self.tables.remove(index);
-    //         tracing::info!("Table `{}` dropped successfully", removed_table.name);
-    //
-    //         // Save the updated database
-    //         self.save_to_file()
-    //             .map_err(|e| DatabaseError::SaveError(e))?;
-    //         Ok(())
-    //     } else {
-    //         tracing::error!("{}", DatabaseError::TableNotFound(table_name.to_string()));
-    //         Ok(())
-    //     }
-    // }
-
     pub(crate) fn save_to_file(&self) -> Result<(), std::io::Error> {
         let json_data = serde_json::to_string_pretty(&self)?;
         std::fs::write(&self.file_name, json_data)?;
@@ -210,28 +189,6 @@ impl Database {
         tracing::info!("Database loaded from file: {}", file_name);
         Ok(db)
     }
-
-    // pub(crate) fn load_from_file_instance(&mut self) -> Result<(), std::io::Error> {
-    //     let json_data = std::fs::read_to_string(&self.file_name)?;
-    //     let db: Database = serde_json::from_str(&json_data)?;
-    //     tracing::info!("Database loaded from file: {}", self.file_name);
-    //
-    //     // Update the current instance with loaded data
-    //     self.name = db.name;
-    //     self.tables = db.tables;
-    //     Ok(())
-    // }
-    //
-    // pub(crate) async fn load_from_file_instance_async(&mut self) -> Result<(), tokio::io::Error> {
-    //     let json_data = tokio::fs::read_to_string(&self.file_name).await?;
-    //     let db: Database = serde_json::from_str(&json_data)?;
-    //     tracing::info!("Database loaded from file: {}", self.file_name);
-    //
-    //     // Update the current instance with loaded data
-    //     self.name = db.name;
-    //     self.tables = db.tables;
-    //     Ok(())
-    // }
 
     pub(crate) fn get_table_mut(&mut self, table_name: &str) -> Option<&mut Table> {
         self.tables.iter_mut().find(|t| t.name == table_name)
