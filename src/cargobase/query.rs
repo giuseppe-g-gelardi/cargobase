@@ -165,45 +165,72 @@ impl Query {
         key: &str,
         value: &str,
     ) -> Result<Option<T>, DatabaseError> {
-        for row in &mut table.rows {
-            if let Some(field_value) = row.data.get(key) {
-                if field_value.as_str() == Some(value) {
-                    if let Some(update_data) = &self.update_data {
-                        if let Value::Object(update_map) = update_data {
-                            if let Value::Object(row_map) = &mut row.data {
-                                for (k, v) in update_map {
-                                    row_map.insert(k.clone(), v.clone());
-                                }
-                            } else {
-                                return Err(DatabaseError::InvalidData(
-                                    "Row data is not a JSON object.".to_string(),
-                                ));
-                            }
+        // Find the row that matches the key-value pair
+        if let Some(row) = self.find_matching_row(table, key, value)? {
+            // Update the row with the provided data
+            self.apply_update_to_row(row, &self.update_data)?;
 
-                            tracing::info!("Record updated successfully.");
-                            return serde_json::from_value(row.data.clone()).map(Some).map_err(
-                                |e| {
-                                    DatabaseError::InvalidData(format!(
-                                        "Deserialization error: {}",
-                                        e
-                                    ))
-                                },
-                            );
-                        } else {
-                            return Err(DatabaseError::InvalidData(
-                                "Invalid update data format.".to_string(),
-                            ));
-                        }
-                    } else {
-                        return Err(DatabaseError::InvalidData(
-                            "No update data provided.".to_string(),
-                        ));
-                    }
-                }
-            }
+            // Log and return the updated row
+            tracing::info!("Record updated successfully.");
+            return self.deserialize_row(row);
         }
 
         Ok(None) // No matching record found
+    }
+
+    // Helper: Find the matching row based on key-value pair
+    fn find_matching_row<'a>(
+        &self,
+        table: &'a mut Table,
+        key: &str,
+        value: &str,
+    ) -> Result<Option<&'a mut Row>, DatabaseError> {
+        for row in &mut table.rows {
+            if let Some(field_value) = row.data.get(key) {
+                if field_value.as_str() == Some(value) {
+                    return Ok(Some(row));
+                }
+            }
+        }
+        Ok(None)
+    }
+
+    // Helper: Apply the update data to the row
+    fn apply_update_to_row(
+        &self,
+        row: &mut Row,
+        update_data: &Option<Value>,
+    ) -> Result<(), DatabaseError> {
+        let update_map = match update_data {
+            Some(Value::Object(map)) => map,
+            Some(_) => {
+                return Err(DatabaseError::InvalidData(
+                    "Invalid update data format.".to_string(),
+                ))
+            }
+            None => {
+                return Err(DatabaseError::InvalidData(
+                    "No update data provided.".to_string(),
+                ))
+            }
+        };
+
+        let row_map = row.data.as_object_mut().ok_or_else(|| {
+            DatabaseError::InvalidData("Row data is not a JSON object.".to_string())
+        })?;
+
+        for (k, v) in update_map {
+            row_map.insert(k.clone(), v.clone());
+        }
+
+        Ok(())
+    }
+
+    // Helper: Deserialize the updated row
+    fn deserialize_row<T: DeserializeOwned>(&self, row: &Row) -> Result<Option<T>, DatabaseError> {
+        serde_json::from_value(row.data.clone())
+            .map(Some)
+            .map_err(|e| DatabaseError::InvalidData(format!("Deserialization error: {}", e)))
     }
 
     fn execute_delete<T: DeserializeOwned>(
@@ -784,4 +811,66 @@ mod tests {
 //         tracing::error!("Table name not provided");
 //         Vec::new()
 //     }
+// }
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+// fn execute_update<T: DeserializeOwned>(
+//     &self,
+//     table: &mut Table,
+//     key: &str,
+//     value: &str,
+// ) -> Result<Option<T>, DatabaseError> {
+//     for row in &mut table.rows {
+//         if let Some(field_value) = row.data.get(key) {
+//             if field_value.as_str() == Some(value) {
+//                 if let Some(update_data) = &self.update_data {
+//                     if let Value::Object(update_map) = update_data {
+//                         if let Value::Object(row_map) = &mut row.data {
+//                             for (k, v) in update_map {
+//                                 row_map.insert(k.clone(), v.clone());
+//                             }
+//                         } else {
+//                             return Err(DatabaseError::InvalidData(
+//                                 "Row data is not a JSON object.".to_string(),
+//                             ));
+//                         }
+//
+//                         tracing::info!("Record updated successfully.");
+//                         return serde_json::from_value(row.data.clone()).map(Some).map_err(
+//                             |e| {
+//                                 DatabaseError::InvalidData(format!(
+//                                     "Deserialization error: {}",
+//                                     e
+//                                 ))
+//                             },
+//                         );
+//                     } else {
+//                         return Err(DatabaseError::InvalidData(
+//                             "Invalid update data format.".to_string(),
+//                         ));
+//                     }
+//                 } else {
+//                     return Err(DatabaseError::InvalidData(
+//                         "No update data provided.".to_string(),
+//                     ));
+//                 }
+//             }
+//         }
+//     }
+//
+//     Ok(None) // No matching record found
 // }

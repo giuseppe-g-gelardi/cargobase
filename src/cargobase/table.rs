@@ -20,6 +20,7 @@ impl Table {
         }
     }
 
+    // #[cfg(not(feature = "async"))]
     pub fn add_row(&mut self, db: &mut Database, data: Value) {
         if let Some(table) = db.get_table_mut(&self.name) {
             if data.is_array() {
@@ -39,6 +40,7 @@ impl Table {
         }
     }
 
+    // #[cfg(feature = "async")]
     pub async fn add_row_async(&mut self, db: &mut Database, data: Value) {
         if let Some(table) = db.get_table_mut(&self.name) {
             if data.is_array() {
