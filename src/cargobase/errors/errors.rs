@@ -9,7 +9,6 @@ pub enum DatabaseError {
     SaveError(std::io::Error),
 
     #[error("Failed to drop database: `{0}`")]
-    // return Err(DatabaseError::DeleteError);
     DeleteError(String),
 
     #[error("Table `{0}` already exists. skipping creation.")] // skipping creation
@@ -32,11 +31,4 @@ pub enum DatabaseError {
 
     #[error("")] // could expand to specify serialization/deserialization error
     JSONError(#[from] serde_json::Error),
-
-    // #[error("IO error: `{0}`")]
-    // Io(#[from] std::io::Error),
-    //
-    // #[cfg(feature = "async")]
-    // #[error("Tokio IO error: `{0}`")]
-    // TokioIo(#[from] tokio::io::Error),
 }

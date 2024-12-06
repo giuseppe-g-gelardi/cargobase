@@ -8,7 +8,8 @@ serde = { version = "1.0.215", features = ["derive"] }
 serde_json = { version = "1.0.132", features = ["raw_value"] }
 serde_derive = "1.0.188"
 base64 = "0.22.1"
-tokio = { version = "1", features = ["full"], optional = true}
+# tokio = { version = "1", features = ["full"], optional = true}
+tokio = { version = "1", features = ["full"] }
 uuid = {version ="1.11.0", features = ["v4"] }
 thiserror = "2.0.3"
 tempfile = "3.14.0"
@@ -17,9 +18,10 @@ tracing = "0.1"
 tracing-subscriber = "0.3"
 tracing-test = "0.2.5"
 
-[features]
-default = ["sync", "async"] # for development
+# [features]
+# default = ["sync", "async"] # for development
 # default = ["sync"]
-sync = [] # synchronous features only
-async = ["tokio"] # asynchronous features only
-full = ["sync", "async"] # all features
+# sync = [] # synchronous features only
+# async = ["tokio"] # asynchronous features only
+# full = ["sync", "async"] # all features
+# still need a feature for logging/tracing

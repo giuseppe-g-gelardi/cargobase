@@ -24,7 +24,6 @@ pub fn setup_temp_db() -> Database {
     db
 }
 
-#[cfg(feature = "async")]
 pub async fn setup_temp_db_async() -> Database {
     let temp_file = NamedTempFile::new().expect("Failed to create a temporary file");
     let db_path = temp_file.path().to_str().unwrap().to_string();
@@ -73,7 +72,6 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "async")]
     #[tokio::test]
     async fn test_setup_temp_db_async() {
         let db = setup_temp_db_async().await;
@@ -81,7 +79,6 @@ mod tests {
         assert_eq!(db.tables[0].name, "TestTable");
     }
 
-    #[cfg(feature = "async")]
     #[tokio::test]
     async fn test_temp_file_cleanup_async() {
         // Create a temporary database
