@@ -41,7 +41,7 @@ impl Database {
         }
     }
 
-    #[cfg(feature = "async")]
+    // #[cfg(feature = "async")]
     pub async fn new_async(name: &str) -> Self {
         let name = name.to_string();
         let file_name = format!("{name}.json");
@@ -83,7 +83,7 @@ impl Database {
         Ok(())
     }
 
-    #[cfg(feature = "async")]
+    // #[cfg(feature = "async")]
     pub async fn drop_database_async(&self) -> Result<(), DatabaseError> {
         if tokio::fs::remove_file(&self.file_name).await.is_err() {
             tracing::error!(
@@ -111,7 +111,7 @@ impl Database {
         Ok(())
     }
 
-    #[cfg(feature = "async")]
+    // #[cfg(feature = "async")]
     pub async fn add_table_async(&mut self, table: &mut Table) -> Result<(), DatabaseError> {
         if self.tables.iter().any(|t| t.name == table.name) {
             tracing::warn!(
@@ -145,7 +145,7 @@ impl Database {
         }
     }
 
-    #[cfg(feature = "async")]
+    // #[cfg(feature = "async")]
     pub async fn drop_table_async(&mut self, table_name: &str) -> Result<(), DatabaseError> {
         let mut db = Database::load_from_file_async(&self.file_name)
             .await
@@ -194,7 +194,7 @@ impl Database {
         Ok(())
     }
 
-    #[cfg(feature = "async")]
+    // #[cfg(feature = "async")]
     pub(crate) async fn save_to_file_async(&self) -> Result<(), tokio::io::Error> {
         let json_data = serde_json::to_string_pretty(&self)?;
         tokio::fs::write(&self.file_name, json_data).await?;
@@ -209,7 +209,7 @@ impl Database {
         Ok(db)
     }
 
-    #[cfg(feature = "async")]
+    // #[cfg(feature = "async")]
     pub(crate) async fn load_from_file_async(file_name: &str) -> Result<Self, tokio::io::Error> {
         let json_data = tokio::fs::read_to_string(file_name).await?;
         let db: Database = serde_json::from_str(&json_data)?;
@@ -334,7 +334,7 @@ mod tests {
         assert_eq!(db.tables.len(), 1); // the setup_temp_db function adds a table
     }
 
-    #[cfg(feature = "async")]
+    // #[cfg(feature = "async")]
     #[tokio::test]
     async fn test_database_new_async() {
         let db = setup_temp_db_async().await;
@@ -356,7 +356,7 @@ mod tests {
         assert!(!std::path::Path::new(&db.file_name).exists());
     }
 
-    #[cfg(feature = "async")]
+    // #[cfg(feature = "async")]
     #[tokio::test]
     async fn test_drop_database_async() {
         let db = setup_temp_db_async().await;
@@ -386,7 +386,7 @@ mod tests {
         std::fs::remove_file("test_db.json").ok();
     }
 
-    #[cfg(feature = "async")]
+    // #[cfg(feature = "async")]
     #[tokio::test]
     async fn test_add_table_success_async() {
         // this test does not use the setup_temp_db function
@@ -456,7 +456,7 @@ mod tests {
         assert_eq!(db.tables.len(), 0);
     }
 
-    #[cfg(feature = "async")]
+    // #[cfg(feature = "async")]
     #[tokio::test]
     async fn test_drop_table_success_async() {
         let mut db = setup_temp_db_async().await;
@@ -517,7 +517,7 @@ mod tests {
         assert_eq!(db, loaded_db);
     }
 
-    #[cfg(feature = "async")]
+    // #[cfg(feature = "async")]
     #[tokio::test]
     async fn test_save_to_file_async() {
         use tempfile::NamedTempFile;
@@ -538,7 +538,7 @@ mod tests {
         assert_eq!(db, loaded_db);
     }
 
-    #[cfg(feature = "async")]
+    // #[cfg(feature = "async")]
     #[tokio::test]
     async fn test_load_from_file_async() {
         use tempfile::NamedTempFile;
