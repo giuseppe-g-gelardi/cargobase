@@ -2,7 +2,7 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use super::{Database, DatabaseError, Row, Table};
+use crate::{Database, DatabaseError, Row, Table};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Copy)]
 pub enum Operation {
@@ -37,7 +37,6 @@ impl Query {
         self
     }
 
-    // #[cfg(not(feature = "async"))]
     pub fn where_eq<T: DeserializeOwned + Default>(
         self,
         key: &str,
@@ -46,19 +45,6 @@ impl Query {
         let mut db =
             Database::load_from_file(&self.db_file_name).map_err(DatabaseError::LoadError)?;
         self.handle_where_eq(&mut db, key, value)
-    }
-
-    // #[cfg(feature = "async")]
-    // pub async fn where_eq<T: DeserializeOwned + Default>(
-    pub async fn where_eq_async<T: DeserializeOwned + Default>(
-        self,
-        key: &str,
-        value: &str,
-    ) -> Result<Option<T>, DatabaseError> {
-        let mut db = Database::load_from_file_async(&self.db_file_name)
-            .await
-            .map_err(DatabaseError::LoadError)?;
-        self.handle_where_eq(&mut db, key, value) // Shared logic
     }
 
     // Shared logic for where_eq
@@ -99,20 +85,10 @@ impl Query {
         }
     }
 
-    // #[cfg(not(feature = "async"))]
     pub fn execute_add(self) -> Result<(), DatabaseError> {
         let mut db =
             Database::load_from_file(&self.db_file_name).map_err(DatabaseError::LoadError)?;
         self.handle_execute_add_sync(&mut db)
-    }
-
-    // #[cfg(feature = "async")]
-    // pub async fn execute_add(self) -> Result<(), DatabaseError> {
-    pub async fn execute_add_async(self) -> Result<(), DatabaseError> {
-        let mut db = Database::load_from_file_async(&self.db_file_name)
-            .await
-            .map_err(DatabaseError::LoadError)?;
-        self.handle_execute_add_sync(&mut db) // Shared logic
     }
 
     fn handle_execute_add_sync(&self, db: &mut Database) -> Result<(), DatabaseError> {
@@ -255,7 +231,6 @@ impl Query {
         Ok(None) // No matching record found
     }
 
-    // #[cfg(not(feature = "async"))]
     pub fn all<T: DeserializeOwned>(&self) -> Vec<T> {
         let db = Database::load_from_file(&self.db_file_name).unwrap_or_else(|e| {
             tracing::error!("Failed to load database from file: {}", e);
@@ -266,22 +241,6 @@ impl Query {
             }
         });
         self.handle_all(&db)
-    }
-
-    // #[cfg(feature = "async")]
-    // pub async fn all<T: DeserializeOwned>(&self) -> Vec<T> {
-    pub async fn all_async<T: DeserializeOwned>(&self) -> Vec<T> {
-        let db = Database::load_from_file_async(&self.db_file_name)
-            .await
-            .unwrap_or_else(|e| {
-                tracing::error!("Failed to load database from file: {}", e);
-                Database {
-                    name: String::new(),
-                    file_name: self.db_file_name.clone(),
-                    tables: Vec::new(),
-                }
-            });
-        self.handle_all(&db) // Shared logic
     }
 
     fn handle_all<T: DeserializeOwned>(&self, db: &Database) -> Vec<T> {
@@ -308,10 +267,10 @@ impl Query {
 
 #[cfg(test)]
 mod tests {
+    use crate::setup_temp_db;
+
     use super::*;
     use serde_json::json;
-
-    use crate::cargobase::{setup_temp_db, setup_temp_db_async};
 
     #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
     struct TestData {
@@ -536,341 +495,4 @@ mod tests {
         assert!(deleted_record.is_none(), "Expected record to be deleted");
         assert!(rows.is_empty(), "Expected all records to be deleted");
     }
-
-    // #[cfg(feature = "async")]
-    #[tokio::test]
-    async fn test_query_where_eq_match_async() {
-        let mut db = setup_temp_db_async().await;
-
-        let test_data = TestData {
-            id: "1".to_string(),
-            name: "Alice".to_string(),
-        };
-
-        db.add_row()
-            .from("TestTable")
-            .data_from_struct(test_data.clone())
-            .execute_add_async()
-            .await
-            .expect("Failed to add row");
-
-        let result: Option<TestData> = db
-            .get_rows()
-            .from("TestTable")
-            .where_eq_async("id", "1")
-            .await
-            .unwrap();
-
-        assert_eq!(result, Some(test_data), "Expected matching record");
-    }
-
-    // #[cfg(feature = "async")]
-    #[tokio::test]
-    async fn test_query_execute_update_async() {
-        let mut db = setup_temp_db_async().await;
-
-        let test_data = TestData {
-            id: "1".to_string(),
-            name: "Alice".to_string(),
-        };
-
-        db.add_row()
-            .from("TestTable")
-            .data_from_struct(test_data.clone())
-            .execute_add_async()
-            .await
-            .expect("Failed to add row");
-
-        let update_data = json!({ "name": "Updated Alice" });
-
-        let result = db
-            .update_row()
-            .from("TestTable")
-            .data(update_data)
-            .where_eq_async::<TestData>("id", "1")
-            .await
-            .unwrap();
-
-        assert!(
-            result.is_some(),
-            "Expected update to return the updated record"
-        );
-        assert_eq!(
-            result.unwrap().name,
-            "Updated Alice",
-            "Name was not updated"
-        );
-    }
-
-    // #[cfg(feature = "async")]
-    #[tokio::test]
-    async fn test_query_all_async() {
-        let mut db = setup_temp_db_async().await;
-
-        let test_data1 = TestData {
-            id: "1".to_string(),
-            name: "Alice".to_string(),
-        };
-        let test_data2 = TestData {
-            id: "2".to_string(),
-            name: "Bob".to_string(),
-        };
-
-        db.add_row()
-            .from("TestTable")
-            .data_from_struct(test_data1.clone())
-            .execute_add_async()
-            .await
-            .expect("Failed to add row 1");
-
-        db.add_row()
-            .from("TestTable")
-            .data_from_struct(test_data2.clone())
-            .execute_add_async()
-            .await
-            .expect("Failed to add row 2");
-
-        let rows: Vec<TestData> = db.get_rows().from("TestTable").all_async().await;
-
-        assert_eq!(rows.len(), 2);
-        assert!(rows.contains(&test_data1));
-        assert!(rows.contains(&test_data2));
-    }
-
-    // #[cfg(feature = "async")]
-    #[tokio::test]
-    async fn test_query_execute_delete_async() {
-        let mut db = setup_temp_db_async().await;
-
-        let test_data = TestData {
-            id: "1".to_string(),
-            name: "Alice".to_string(),
-        };
-
-        db.add_row()
-            .from("TestTable")
-            .data_from_struct(test_data.clone())
-            .execute_add_async()
-            .await
-            .expect("Failed to add row");
-
-        let result = db
-            .get_single()
-            .from("TestTable")
-            .where_eq_async::<TestData>("id", "1")
-            .await
-            .unwrap();
-
-        assert!(result.is_some(), "Expected record to exist before deletion");
-
-        let _ = db
-            .delete_single()
-            .from("TestTable")
-            .where_eq_async::<TestData>("id", "1")
-            .await
-            .unwrap();
-
-        let rows: Vec<TestData> = db.get_rows().from("TestTable").all_async().await;
-        let deleted_record = db
-            .get_single()
-            .from("TestTable")
-            .where_eq_async::<TestData>("id", "1")
-            .await
-            .unwrap();
-
-        assert!(deleted_record.is_none(), "Expected record to be deleted");
-        assert!(rows.is_empty(), "Expected all records to be deleted");
-    }
 }
-
-// pub fn where_eq<T: DeserializeOwned + Default>(
-//     self,
-//     key: &str,
-//     value: &str,
-// ) -> Result<Option<T>, DatabaseError> {
-//     // Load the database
-//     let mut db = Database::load_from_file(&self.db_file_name)
-//         .map_err(|e| DatabaseError::LoadError(e))?;
-//
-//     // Clone table_name to avoid moving self
-//     let table_name = self
-//         .table_name
-//         .clone()
-//         .ok_or_else(|| DatabaseError::TableNotFound("Table name not specified.".to_string()))?;
-//
-//     // Find the index of the table
-//     let table_index = db
-//         .tables
-//         .iter()
-//         .position(|t| t.name == table_name)
-//         .ok_or_else(|| {
-//             DatabaseError::TableNotFound(format!("Table '{}' not found.", table_name))
-//         })?;
-//
-//     // Borrow the table by index
-//     let table = &mut db.tables[table_index];
-//
-//     // consider thiserror for the error handling for these operations
-//     match self.operation {
-//         Operation::Read => self.execute_select(table, key, value),
-//         Operation::Update => {
-//             let result = self.execute_update(table, key, value);
-//             if let Err(e) = db.save_to_file().map_err(DatabaseError::SaveError) {
-//                 tracing::error!("Failed to save database: {}", e);
-//                 return Err(e);
-//             }
-//             result
-//         }
-//         Operation::Delete => {
-//             let result = self.execute_delete(table, key, value);
-//             if let Err(e) = db.save_to_file().map_err(DatabaseError::SaveError) {
-//                 tracing::error!("Failed to save database: {}", e);
-//                 return Err(e);
-//             }
-//             result
-//         }
-//         Operation::Create => unreachable!(),
-//     }
-// }
-//
-//
-//
-//
-//
-//
-//
-// pub fn execute_add(self) -> Result<(), DatabaseError> {
-//     let mut db =
-//         Database::load_from_file(&self.db_file_name).map_err(DatabaseError::LoadError)?;
-//
-//     let table_name = self
-//         .table_name
-//         .clone()
-//         .ok_or_else(|| DatabaseError::InvalidData("Table name not specified.".to_string()))?;
-//
-//     // Find the table
-//     let table = db
-//         .tables
-//         .iter_mut()
-//         .find(|t| t.name == table_name)
-//         .ok_or_else(|| DatabaseError::TableNotFound(table_name.clone()))?;
-//
-//     // Validate and add the row
-//     if let Some(row_data) = self.row_data {
-//         table.columns.validate(row_data.clone())?; // optional schema validation
-//         table.rows.push(Row::new(row_data));
-//
-//         db.save_to_file().map_err(DatabaseError::SaveError)?;
-//         tracing::info!("Row added successfully to '{}'.", table_name);
-//         Ok(())
-//     } else {
-//         tracing::error!("No data provided for the new row.");
-//         Err(DatabaseError::InvalidData(
-//             "No data provided for the new row.".to_string(),
-//         ))
-//     }
-// }
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-// pub fn all<T: DeserializeOwned>(&self) -> Vec<T> {
-//     let db = Database::load_from_file(&self.db_file_name).unwrap_or_else(|e| {
-//         tracing::error!("Failed to load database from file: {}", e);
-//         Database {
-//             name: String::new(),
-//             file_name: self.db_file_name.clone(),
-//             tables: Vec::new(),
-//         }
-//     });
-//
-//     if let Some(table_name) = &self.table_name {
-//         if let Some(table) = db.tables.iter().find(|t| t.name == *table_name) {
-//             table
-//                 .rows
-//                 .iter()
-//                 .filter_map(|row| serde_json::from_value(row.data.clone()).ok())
-//                 .collect()
-//         } else {
-//             tracing::error!("Table {} not found", table_name);
-//             Vec::new()
-//         }
-//     } else {
-//         tracing::error!("Table name not provided");
-//         Vec::new()
-//     }
-// }
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-// fn execute_update<T: DeserializeOwned>(
-//     &self,
-//     table: &mut Table,
-//     key: &str,
-//     value: &str,
-// ) -> Result<Option<T>, DatabaseError> {
-//     for row in &mut table.rows {
-//         if let Some(field_value) = row.data.get(key) {
-//             if field_value.as_str() == Some(value) {
-//                 if let Some(update_data) = &self.update_data {
-//                     if let Value::Object(update_map) = update_data {
-//                         if let Value::Object(row_map) = &mut row.data {
-//                             for (k, v) in update_map {
-//                                 row_map.insert(k.clone(), v.clone());
-//                             }
-//                         } else {
-//                             return Err(DatabaseError::InvalidData(
-//                                 "Row data is not a JSON object.".to_string(),
-//                             ));
-//                         }
-//
-//                         tracing::info!("Record updated successfully.");
-//                         return serde_json::from_value(row.data.clone()).map(Some).map_err(
-//                             |e| {
-//                                 DatabaseError::InvalidData(format!(
-//                                     "Deserialization error: {}",
-//                                     e
-//                                 ))
-//                             },
-//                         );
-//                     } else {
-//                         return Err(DatabaseError::InvalidData(
-//                             "Invalid update data format.".to_string(),
-//                         ));
-//                     }
-//                 } else {
-//                     return Err(DatabaseError::InvalidData(
-//                         "No update data provided.".to_string(),
-//                     ));
-//                 }
-//             }
-//         }
-//     }
-//
-//     Ok(None) // No matching record found
-// }

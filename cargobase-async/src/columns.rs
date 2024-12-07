@@ -4,7 +4,7 @@ use serde_json::Value;
 use serde_reflection::{ContainerFormat, Named, Tracer, TracerConfig};
 use tracing;
 
-use super::DatabaseError;
+use crate::DatabaseError;
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct Column {
