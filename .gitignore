@@ -23,6 +23,4 @@ Cargo.lock
 cargobase.json
 cargobase-async.json
 
-src/main.rs
-
 .env
