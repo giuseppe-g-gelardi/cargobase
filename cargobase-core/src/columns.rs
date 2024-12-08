@@ -7,8 +7,8 @@ use crate::DatabaseError;
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct Column {
-    pub(crate) name: String,
-    pub(crate) required: bool,
+    pub name: String,
+    pub required: bool,
 }
 
 impl Column {

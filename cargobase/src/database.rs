@@ -1,7 +1,9 @@
 use serde::{Deserialize, Serialize};
 use tracing;
 
-use crate::{query::Operation, query::Query, table::Table, view::View, DatabaseError};
+use cargobase_core::DatabaseError;
+
+use crate::{query::Operation, query::Query, table::Table, view::View};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct Database {
@@ -168,7 +170,8 @@ mod tests {
 
     use super::*;
 
-    use crate::{setup_temp_db, Columns, Table};
+    use crate::{setup_temp_db, Table};
+    use cargobase_core::Columns;
 
     #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
     struct TestData {
