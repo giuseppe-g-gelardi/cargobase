@@ -2,7 +2,8 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::{DatabaseAsync, DatabaseError, Row, Table};
+use crate::{DatabaseAsync, Table};
+use cargobase_core::{DatabaseError, Row};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Copy)]
 pub enum Operation {

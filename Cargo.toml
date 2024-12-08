@@ -2,6 +2,7 @@
 members = [
     "cargobase",
     "cargobase-async",
+    "cargobase-core",
     "logg",
 ]
 

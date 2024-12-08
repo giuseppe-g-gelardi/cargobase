@@ -1,7 +1,8 @@
 use serde::{Deserialize, Serialize};
 use tempfile::NamedTempFile;
 
-use crate::{Columns, DatabaseAsync, Table};
+use crate::{DatabaseAsync, Table};
+use cargobase_core::Columns;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 struct TestData {
@@ -30,7 +31,6 @@ pub async fn setup_temp_db_async() -> DatabaseAsync {
 #[cfg(test)]
 mod tests {
     use super::*;
-    // use std::fs;
 
     #[tokio::test]
     async fn test_setup_temp_db_async() {
