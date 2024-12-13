@@ -1,8 +1,7 @@
 use serde::{Deserialize, Serialize};
 use tempfile::NamedTempFile;
 
-use crate::{DatabaseAsync, Table};
-use cargobase_core::Columns;
+use crate::{Columns, DatabaseAsync, Table};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 struct TestData {

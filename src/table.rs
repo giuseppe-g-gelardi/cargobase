@@ -2,8 +2,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tracing;
 
-use crate::DatabaseAsync;
-use cargobase_core::{Columns, Row};
+use crate::{Columns, DatabaseAsync, Row};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct Table {
@@ -46,8 +45,7 @@ impl Table {
 
 #[cfg(test)]
 mod tests {
-    use crate::setup_temp_db_async;
-    use cargobase_core::{Column, Columns};
+    use crate::{setup_temp_db_async, Column, Columns};
 
     use super::*;
 
