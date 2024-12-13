@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tracing;
@@ -7,7 +9,7 @@ use crate::{Columns, Database, Row};
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct Table {
     pub(crate) name: String,
-    pub rows: Vec<Row>,
+    pub rows: HashMap<String, Row>, // Row ID -> Row
     pub columns: Columns,
 }
 
@@ -15,7 +17,7 @@ impl Table {
     pub fn new(name: String, columns: Columns) -> Self {
         Table {
             name,
-            rows: Vec::new(),
+            rows: HashMap::new(),
             columns,
         }
     }

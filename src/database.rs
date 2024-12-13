@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 use tracing;
 
@@ -7,7 +9,7 @@ use crate::{query::Operation, DatabaseError, Query, Table, View};
 pub struct Database {
     pub(crate) name: String,
     pub(crate) file_name: String,
-    pub(crate) tables: Vec<Table>,
+    pub(crate) tables: HashMap<String, Table>, // pub(crate) tables: Vec<Table>,
 }
 
 impl Database {
@@ -36,7 +38,7 @@ impl Database {
         Database {
             name,
             file_name,
-            tables: Vec::new(),
+            tables: HashMap::new(), // tables: Vec::new(),
         }
     }
 
