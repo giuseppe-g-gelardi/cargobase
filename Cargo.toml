@@ -19,3 +19,7 @@ tracing-test = "0.2.5"
 
 [lib]
 path = "src/lib.rs"
+
+[[bin]]
+name = "cargobase"
+path = "main.rs"
