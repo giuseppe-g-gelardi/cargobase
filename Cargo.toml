@@ -3,7 +3,6 @@ members = [
     "cargobase",
     "cargobase-async",
     "cargobase-core",
-    "logg",
 ]
 
 [workspace.package]

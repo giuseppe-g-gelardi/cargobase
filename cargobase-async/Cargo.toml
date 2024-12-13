@@ -3,14 +3,7 @@ name = "cargobase-async"
 version = "0.1.1"
 edition = "2021"
 
-
-[features]
-default = [] # default features / no logging
-logging = ["logg/logging"] # logging features with println!
-tracing = ["logg/tracing"] # logging features with tracing
-
 [dependencies]
-logg = { path = "../logg" }
 cargobase-core = { path = "../cargobase-core" }
 serde = { version = "1.0.215", features = ["derive"] }
 serde_json = { version = "1.0.132", features = ["raw_value"] }
