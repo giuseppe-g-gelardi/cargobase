@@ -279,9 +279,7 @@ mod tests {
             tables: vec![],
         };
 
-        db.save_to_file()
-            .await
-            .expect("Failed to save database");
+        db.save_to_file().await.expect("Failed to save database");
         let loaded_db = Database::load_from_file(&db_path)
             .await
             .expect("Failed to load database");
@@ -301,9 +299,7 @@ mod tests {
             tables: vec![],
         };
 
-        db.save_to_file()
-            .await
-            .expect("Failed to save database");
+        db.save_to_file().await.expect("Failed to save database");
 
         let loaded_db = Database::load_from_file(&db_path)
             .await
