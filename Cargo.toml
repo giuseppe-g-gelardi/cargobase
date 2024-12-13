@@ -2,6 +2,16 @@
 name = "cargobase"
 version = "0.1.1"
 edition = "2021"
+authors = ["Giuseppe Gelardi <giuseppegelardi@icloud.com>"]
+license = "MIT"
+description = "A local, in-memory, and file-based key-value store."
+homepage = "https://github.com/giuseppe-g-gelardi/cargobase"
+repository = "https://github.com/giuseppe-g-gelardi/cargobase"
+documentation = "TODO: https://docs.rs/cargobase"
+readme = "README.md"
+keywords = ["key-value", "store", "database", "in-memory", "file-based", "utility", "local", "rust"]
+categories = ["data-management", "development-tools", "utilities", "database"]
+edition = "2021"
 
 [dependencies]
 serde = { version = "1.0.215", features = ["derive"] }
