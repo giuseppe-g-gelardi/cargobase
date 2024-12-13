@@ -1,12 +1,12 @@
-use crate::{DatabaseAsync, Table};
+use crate::{Database, Table};
 
 pub struct View<'a> {
-    database: &'a DatabaseAsync,
+    database: &'a Database,
 }
 
 impl<'a> View<'a> {
     /// Create a new `View` instance
-    pub fn new(database: &'a DatabaseAsync) -> Self {
+    pub fn new(database: &'a Database) -> Self {
         View { database }
     }
 

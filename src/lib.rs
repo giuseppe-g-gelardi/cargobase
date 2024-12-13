@@ -12,8 +12,8 @@ pub use columns::{Column, Columns};
 pub use errors::DatabaseError;
 pub use row::Row;
 
-pub use database::DatabaseAsync;
+pub use database::Database;
 pub use query::Query;
 pub use table::Table;
-pub use util::setup_temp_db_async;
+pub use util::setup_temp_db;
 pub use view::View;

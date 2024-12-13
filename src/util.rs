@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use tempfile::NamedTempFile;
 
-use crate::{Columns, DatabaseAsync, Table};
+use crate::{Columns, Database, Table};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 struct TestData {
@@ -9,20 +9,18 @@ struct TestData {
     name: String,
 }
 
-pub async fn setup_temp_db_async() -> DatabaseAsync {
+pub async fn setup_temp_db() -> Database {
     let temp_file = NamedTempFile::new().expect("Failed to create a temporary file");
     let db_path = temp_file.path().to_str().unwrap().to_string();
 
     // Initialize the test database
-    let mut db = DatabaseAsync::new_async(&db_path).await;
+    let mut db = Database::new(&db_path).await;
     let test_columns = Columns::from_struct::<TestData>(true);
 
     let mut table = Table::new("TestTable".to_string(), test_columns);
-    db.add_table_async(&mut table).await.unwrap();
+    db.add_table(&mut table).await.unwrap();
 
-    db.save_to_file_async()
-        .await
-        .expect("Failed to save database");
+    db.save_to_file().await.expect("Failed to save database");
 
     db
 }
@@ -32,14 +30,14 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_setup_temp_db_async() {
-        let db = setup_temp_db_async().await;
+    async fn test_setup_temp_db() {
+        let db = setup_temp_db().await;
         assert_eq!(db.tables.len(), 1);
         assert_eq!(db.tables[0].name, "TestTable");
     }
 
     #[tokio::test]
-    async fn test_temp_file_cleanup_async() {
+    async fn test_temp_file_cleanup() {
         // Create a temporary database
         let temp_file = tempfile::Builder::new()
             .prefix("test_db")

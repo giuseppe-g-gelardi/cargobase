@@ -2,7 +2,7 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::{DatabaseAsync, DatabaseError, Row, Table};
+use crate::{Database, DatabaseError, Row, Table};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Copy)]
 pub enum Operation {
@@ -37,12 +37,12 @@ impl Query {
         self
     }
 
-    pub async fn where_eq_async<T: DeserializeOwned + Default>(
+    pub async fn where_eq<T: DeserializeOwned + Default>(
         self,
         key: &str,
         value: &str,
     ) -> Result<Option<T>, DatabaseError> {
-        let mut db = DatabaseAsync::load_from_file_async(&self.db_file_name)
+        let mut db = Database::load_from_file(&self.db_file_name)
             .await
             .map_err(DatabaseError::LoadError)?;
         self.handle_where_eq(&mut db, key, value).await // Shared logic
@@ -51,7 +51,7 @@ impl Query {
     // Shared logic for where_eq
     async fn handle_where_eq<T: DeserializeOwned + Default>(
         &self,
-        db: &mut DatabaseAsync,
+        db: &mut Database,
         key: &str,
         value: &str,
     ) -> Result<Option<T>, DatabaseError> {
@@ -74,14 +74,14 @@ impl Query {
             Operation::Read => self.execute_select(table, key, value),
             Operation::Update => {
                 let result = self.execute_update(table, key, value);
-                db.save_to_file_async()
+                db.save_to_file()
                     .await
                     .map_err(DatabaseError::SaveError)?;
                 result
             }
             Operation::Delete => {
                 let result = self.execute_delete(table, key, value);
-                db.save_to_file_async()
+                db.save_to_file()
                     .await
                     .map_err(DatabaseError::SaveError)?;
                 result
@@ -92,14 +92,14 @@ impl Query {
 
     // #[cfg(feature = "async")]
     // pub async fn execute_add(self) -> Result<(), DatabaseError> {
-    pub async fn execute_add_async(self) -> Result<(), DatabaseError> {
-        let mut db = DatabaseAsync::load_from_file_async(&self.db_file_name)
+    pub async fn execute_add(self) -> Result<(), DatabaseError> {
+        let mut db = Database::load_from_file(&self.db_file_name)
             .await
             .map_err(DatabaseError::LoadError)?;
         self.handle_execute_add_sync(&mut db).await // Shared logic
     }
 
-    async fn handle_execute_add_sync(&self, db: &mut DatabaseAsync) -> Result<(), DatabaseError> {
+    async fn handle_execute_add_sync(&self, db: &mut Database) -> Result<(), DatabaseError> {
         let table_name = self
             .table_name
             .clone()
@@ -114,7 +114,7 @@ impl Query {
         if let Some(row_data) = self.row_data.clone() {
             table.columns.validate(row_data.clone())?;
             table.rows.push(Row::new(row_data));
-            db.save_to_file_async()
+            db.save_to_file()
                 .await
                 .map_err(DatabaseError::SaveError)?;
             Ok(())
@@ -241,12 +241,12 @@ impl Query {
         Ok(None) // No matching record found
     }
 
-    pub async fn all_async<T: DeserializeOwned>(&self) -> Vec<T> {
-        let db = DatabaseAsync::load_from_file_async(&self.db_file_name)
+    pub async fn all<T: DeserializeOwned>(&self) -> Vec<T> {
+        let db = Database::load_from_file(&self.db_file_name)
             .await
             .unwrap_or_else(|e| {
                 tracing::error!("Failed to load database from file: {}", e);
-                DatabaseAsync {
+                Database {
                     name: String::new(),
                     file_name: self.db_file_name.clone(),
                     tables: Vec::new(),
@@ -255,7 +255,7 @@ impl Query {
         self.handle_all(&db) // Shared logic
     }
 
-    fn handle_all<T: DeserializeOwned>(&self, db: &DatabaseAsync) -> Vec<T> {
+    fn handle_all<T: DeserializeOwned>(&self, db: &Database) -> Vec<T> {
         if let Some(table_name) = &self.table_name {
             if let Some(table) = db.tables.iter().find(|t| t.name == *table_name) {
                 table
@@ -282,7 +282,7 @@ mod tests {
     use super::*;
     use serde_json::json;
 
-    use crate::setup_temp_db_async;
+    use crate::setup_temp_db;
 
     #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
     struct TestData {
@@ -344,7 +344,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_query_all() {
-        let mut db = setup_temp_db_async().await;
+        let mut db = setup_temp_db().await;
 
         let test_data1 = TestData {
             id: "1".to_string(),
@@ -358,18 +358,18 @@ mod tests {
         db.add_row()
             .from("TestTable")
             .data_from_struct(test_data1.clone())
-            .execute_add_async()
+            .execute_add()
             .await
             .expect("Failed to add row 1");
 
         db.add_row()
             .from("TestTable")
             .data_from_struct(test_data2.clone())
-            .execute_add_async()
+            .execute_add()
             .await
             .expect("Failed to add row 2");
 
-        let rows: Vec<TestData> = db.get_rows().from("TestTable").all_async().await;
+        let rows: Vec<TestData> = db.get_rows().from("TestTable").all().await;
 
         assert_eq!(rows.len(), 2);
         assert!(rows.contains(&test_data1));
@@ -395,7 +395,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_query_where_eq_no_match() {
-        let mut db = setup_temp_db_async().await;
+        let mut db = setup_temp_db().await;
 
         let test_data = TestData {
             id: "1".to_string(),
@@ -405,14 +405,14 @@ mod tests {
         db.add_row()
             .from("TestTable")
             .data_from_struct(test_data)
-            .execute_add_async()
+            .execute_add()
             .await
             .expect("Failed to add row");
 
         let result: Option<TestData> = db
             .get_rows()
             .from("TestTable")
-            .where_eq_async("id", "999")
+            .where_eq("id", "999")
             .await
             .unwrap();
         assert!(result.is_none(), "Expected no matching record");
@@ -420,7 +420,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_query_where_eq_match() {
-        let mut db = setup_temp_db_async().await;
+        let mut db = setup_temp_db().await;
 
         let test_data = TestData {
             id: "1".to_string(),
@@ -430,14 +430,14 @@ mod tests {
         db.add_row()
             .from("TestTable")
             .data_from_struct(test_data.clone())
-            .execute_add_async()
+            .execute_add()
             .await
             .expect("Failed to add row");
 
         let result: Option<TestData> = db
             .get_rows()
             .from("TestTable")
-            .where_eq_async("id", "1")
+            .where_eq("id", "1")
             .await
             .unwrap();
         assert_eq!(result, Some(test_data), "Expected matching record");
@@ -445,7 +445,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_query_execute_update() {
-        let mut db = setup_temp_db_async().await;
+        let mut db = setup_temp_db().await;
 
         let test_data = TestData {
             id: "1".to_string(),
@@ -455,7 +455,7 @@ mod tests {
         db.add_row()
             .from("TestTable")
             .data_from_struct(test_data.clone())
-            .execute_add_async()
+            .execute_add()
             .await
             .expect("Failed to add row");
 
@@ -465,7 +465,7 @@ mod tests {
             .update_row()
             .from("TestTable")
             .data(update_data)
-            .where_eq_async::<TestData>("id", "1")
+            .where_eq::<TestData>("id", "1")
             .await
             .unwrap();
 
@@ -482,7 +482,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_query_execute_delete() {
-        let mut db = setup_temp_db_async().await;
+        let mut db = setup_temp_db().await;
 
         let test_data = TestData {
             id: "1".to_string(),
@@ -492,14 +492,14 @@ mod tests {
         db.add_row()
             .from("TestTable")
             .data_from_struct(test_data.clone())
-            .execute_add_async()
+            .execute_add()
             .await
             .expect("Failed to add row");
 
         let result = db
             .get_single()
             .from("TestTable")
-            .where_eq_async::<TestData>("id", "1")
+            .where_eq::<TestData>("id", "1")
             .await
             .unwrap();
 
@@ -508,15 +508,15 @@ mod tests {
         let _ = db
             .delete_single()
             .from("TestTable")
-            .where_eq_async::<TestData>("id", "1")
+            .where_eq::<TestData>("id", "1")
             .await
             .unwrap();
 
-        let rows: Vec<TestData> = db.get_rows().from("TestTable").all_async().await;
+        let rows: Vec<TestData> = db.get_rows().from("TestTable").all().await;
         let deleted_record = db
             .get_single()
             .from("TestTable")
-            .where_eq_async::<TestData>("id", "1")
+            .where_eq::<TestData>("id", "1")
             .await
             .unwrap();
 
@@ -524,150 +524,150 @@ mod tests {
         assert!(rows.is_empty(), "Expected all records to be deleted");
     }
 
-    // #[cfg(feature = "async")]
-    #[tokio::test]
-    async fn test_query_where_eq_match_async() {
-        let mut db = setup_temp_db_async().await;
-
-        let test_data = TestData {
-            id: "1".to_string(),
-            name: "Alice".to_string(),
-        };
-
-        db.add_row()
-            .from("TestTable")
-            .data_from_struct(test_data.clone())
-            .execute_add_async()
-            .await
-            .expect("Failed to add row");
-
-        let result: Option<TestData> = db
-            .get_rows()
-            .from("TestTable")
-            .where_eq_async("id", "1")
-            .await
-            .unwrap();
-
-        assert_eq!(result, Some(test_data), "Expected matching record");
-    }
-
-    // #[cfg(feature = "async")]
-    #[tokio::test]
-    async fn test_query_execute_update_async() {
-        let mut db = setup_temp_db_async().await;
-
-        let test_data = TestData {
-            id: "1".to_string(),
-            name: "Alice".to_string(),
-        };
-
-        db.add_row()
-            .from("TestTable")
-            .data_from_struct(test_data.clone())
-            .execute_add_async()
-            .await
-            .expect("Failed to add row");
-
-        let update_data = json!({ "name": "Updated Alice" });
-
-        let result = db
-            .update_row()
-            .from("TestTable")
-            .data(update_data)
-            .where_eq_async::<TestData>("id", "1")
-            .await
-            .unwrap();
-
-        assert!(
-            result.is_some(),
-            "Expected update to return the updated record"
-        );
-        assert_eq!(
-            result.unwrap().name,
-            "Updated Alice",
-            "Name was not updated"
-        );
-    }
-
-    // #[cfg(feature = "async")]
-    #[tokio::test]
-    async fn test_query_all_async() {
-        let mut db = setup_temp_db_async().await;
-
-        let test_data1 = TestData {
-            id: "1".to_string(),
-            name: "Alice".to_string(),
-        };
-        let test_data2 = TestData {
-            id: "2".to_string(),
-            name: "Bob".to_string(),
-        };
-
-        db.add_row()
-            .from("TestTable")
-            .data_from_struct(test_data1.clone())
-            .execute_add_async()
-            .await
-            .expect("Failed to add row 1");
-
-        db.add_row()
-            .from("TestTable")
-            .data_from_struct(test_data2.clone())
-            .execute_add_async()
-            .await
-            .expect("Failed to add row 2");
-
-        let rows: Vec<TestData> = db.get_rows().from("TestTable").all_async().await;
-
-        assert_eq!(rows.len(), 2);
-        assert!(rows.contains(&test_data1));
-        assert!(rows.contains(&test_data2));
-    }
-
-    // #[cfg(feature = "async")]
-    #[tokio::test]
-    async fn test_query_execute_delete_async() {
-        let mut db = setup_temp_db_async().await;
-
-        let test_data = TestData {
-            id: "1".to_string(),
-            name: "Alice".to_string(),
-        };
-
-        db.add_row()
-            .from("TestTable")
-            .data_from_struct(test_data.clone())
-            .execute_add_async()
-            .await
-            .expect("Failed to add row");
-
-        let result = db
-            .get_single()
-            .from("TestTable")
-            .where_eq_async::<TestData>("id", "1")
-            .await
-            .unwrap();
-
-        assert!(result.is_some(), "Expected record to exist before deletion");
-
-        let _ = db
-            .delete_single()
-            .from("TestTable")
-            .where_eq_async::<TestData>("id", "1")
-            .await
-            .unwrap();
-
-        let rows: Vec<TestData> = db.get_rows().from("TestTable").all_async().await;
-        let deleted_record = db
-            .get_single()
-            .from("TestTable")
-            .where_eq_async::<TestData>("id", "1")
-            .await
-            .unwrap();
-
-        assert!(deleted_record.is_none(), "Expected record to be deleted");
-        assert!(rows.is_empty(), "Expected all records to be deleted");
-    }
+    // // #[cfg(feature = "async")]
+    // #[tokio::test]
+    // async fn test_query_where_eq_match() {
+    //     let mut db = setup_temp_db().await;
+    //
+    //     let test_data = TestData {
+    //         id: "1".to_string(),
+    //         name: "Alice".to_string(),
+    //     };
+    //
+    //     db.add_row()
+    //         .from("TestTable")
+    //         .data_from_struct(test_data.clone())
+    //         .execute_add()
+    //         .await
+    //         .expect("Failed to add row");
+    //
+    //     let result: Option<TestData> = db
+    //         .get_rows()
+    //         .from("TestTable")
+    //         .where_eq("id", "1")
+    //         .await
+    //         .unwrap();
+    //
+    //     assert_eq!(result, Some(test_data), "Expected matching record");
+    // }
+    //
+    // // #[cfg(feature = "async")]
+    // #[tokio::test]
+    // async fn test_query_execute_update() {
+    //     let mut db = setup_temp_db().await;
+    //
+    //     let test_data = TestData {
+    //         id: "1".to_string(),
+    //         name: "Alice".to_string(),
+    //     };
+    //
+    //     db.add_row()
+    //         .from("TestTable")
+    //         .data_from_struct(test_data.clone())
+    //         .execute_add()
+    //         .await
+    //         .expect("Failed to add row");
+    //
+    //     let update_data = json!({ "name": "Updated Alice" });
+    //
+    //     let result = db
+    //         .update_row()
+    //         .from("TestTable")
+    //         .data(update_data)
+    //         .where_eq::<TestData>("id", "1")
+    //         .await
+    //         .unwrap();
+    //
+    //     assert!(
+    //         result.is_some(),
+    //         "Expected update to return the updated record"
+    //     );
+    //     assert_eq!(
+    //         result.unwrap().name,
+    //         "Updated Alice",
+    //         "Name was not updated"
+    //     );
+    // }
+    //
+    // // #[cfg(feature = "async")]
+    // #[tokio::test]
+    // async fn test_query_all() {
+    //     let mut db = setup_temp_db().await;
+    //
+    //     let test_data1 = TestData {
+    //         id: "1".to_string(),
+    //         name: "Alice".to_string(),
+    //     };
+    //     let test_data2 = TestData {
+    //         id: "2".to_string(),
+    //         name: "Bob".to_string(),
+    //     };
+    //
+    //     db.add_row()
+    //         .from("TestTable")
+    //         .data_from_struct(test_data1.clone())
+    //         .execute_add()
+    //         .await
+    //         .expect("Failed to add row 1");
+    //
+    //     db.add_row()
+    //         .from("TestTable")
+    //         .data_from_struct(test_data2.clone())
+    //         .execute_add()
+    //         .await
+    //         .expect("Failed to add row 2");
+    //
+    //     let rows: Vec<TestData> = db.get_rows().from("TestTable").all().await;
+    //
+    //     assert_eq!(rows.len(), 2);
+    //     assert!(rows.contains(&test_data1));
+    //     assert!(rows.contains(&test_data2));
+    // }
+    //
+    // // #[cfg(feature = "async")]
+    // #[tokio::test]
+    // async fn test_query_execute_delete() {
+    //     let mut db = setup_temp_db().await;
+    //
+    //     let test_data = TestData {
+    //         id: "1".to_string(),
+    //         name: "Alice".to_string(),
+    //     };
+    //
+    //     db.add_row()
+    //         .from("TestTable")
+    //         .data_from_struct(test_data.clone())
+    //         .execute_add()
+    //         .await
+    //         .expect("Failed to add row");
+    //
+    //     let result = db
+    //         .get_single()
+    //         .from("TestTable")
+    //         .where_eq::<TestData>("id", "1")
+    //         .await
+    //         .unwrap();
+    //
+    //     assert!(result.is_some(), "Expected record to exist before deletion");
+    //
+    //     let _ = db
+    //         .delete_single()
+    //         .from("TestTable")
+    //         .where_eq::<TestData>("id", "1")
+    //         .await
+    //         .unwrap();
+    //
+    //     let rows: Vec<TestData> = db.get_rows().from("TestTable").all().await;
+    //     let deleted_record = db
+    //         .get_single()
+    //         .from("TestTable")
+    //         .where_eq::<TestData>("id", "1")
+    //         .await
+    //         .unwrap();
+    //
+    //     assert!(deleted_record.is_none(), "Expected record to be deleted");
+    //     assert!(rows.is_empty(), "Expected all records to be deleted");
+    // }
 }
 
 // pub fn where_eq<T: DeserializeOwned + Default>(
