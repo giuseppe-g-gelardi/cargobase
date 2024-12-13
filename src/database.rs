@@ -104,7 +104,17 @@ impl Database {
     }
 
     pub(crate) fn get_table_mut(&mut self, table_name: &str) -> Option<&mut Table> {
-        self.tables.get_mut(table_name)
+        // self.tables.get_mut(table_name)
+        tracing::debug!("looking for table: {}", table_name);
+        let table = self.tables.get_mut(table_name);
+
+        if let Some(_) = table {
+            tracing::debug!("table found: {}", table_name);
+        } else {
+            tracing::error!("table not found: {}", table_name);
+        }
+
+        table
     }
 
     pub fn add_row(&mut self) -> Query {
