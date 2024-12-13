@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 use tracing;
 
@@ -7,7 +9,7 @@ use crate::{query::Operation, DatabaseError, Query, Table, View};
 pub struct Database {
     pub(crate) name: String,
     pub(crate) file_name: String,
-    pub(crate) tables: Vec<Table>,
+    pub(crate) tables: HashMap<String, Table>, // pub(crate) tables: Vec<Table>,
 }
 
 impl Database {
@@ -36,7 +38,7 @@ impl Database {
         Database {
             name,
             file_name,
-            tables: Vec::new(),
+            tables: HashMap::new(), // tables: Vec::new(),
         }
     }
 
@@ -53,7 +55,7 @@ impl Database {
     }
 
     pub async fn add_table(&mut self, table: &mut Table) -> Result<(), DatabaseError> {
-        if self.tables.iter().any(|t| t.name == table.name) {
+        if self.tables.contains_key(&table.name) {
             tracing::warn!(
                 "{}",
                 DatabaseError::TableAlreadyExists(table.name.to_string())
@@ -61,7 +63,7 @@ impl Database {
             return Ok(());
         }
 
-        self.tables.push(table.clone());
+        self.tables.insert(table.name.clone(), table.clone());
         self.save_to_file()
             .await
             .map_err(|e| DatabaseError::SaveError(e))?;
@@ -73,8 +75,7 @@ impl Database {
             .await
             .map_err(|e| DatabaseError::LoadError(e))?;
 
-        if let Some(index) = db.tables.iter().position(|t| t.name == table_name) {
-            let removed_table = db.tables.remove(index);
+        if let Some(removed_table) = db.tables.remove(table_name) {
             tracing::info!("Table `{}` dropped successfully", removed_table.name);
             db.save_to_file()
                 .await
@@ -103,7 +104,17 @@ impl Database {
     }
 
     pub(crate) fn get_table_mut(&mut self, table_name: &str) -> Option<&mut Table> {
-        self.tables.iter_mut().find(|t| t.name == table_name)
+        // self.tables.get_mut(table_name)
+        tracing::debug!("looking for table: {}", table_name);
+        let table = self.tables.get_mut(table_name);
+
+        if let Some(_) = table {
+            tracing::debug!("table found: {}", table_name);
+        } else {
+            tracing::error!("table not found: {}", table_name);
+        }
+
+        table
     }
 
     pub fn add_row(&mut self) -> Query {
@@ -207,6 +218,7 @@ mod tests {
         // because it needs to test the creation of a new database and table
         tokio::fs::remove_file("test_db.json").await.ok();
         let mut db = Database::new("test_db").await;
+
         let test_columns = Columns::from_struct::<TestData>(true);
         let mut test_table = Table::new("TestTable".to_string(), test_columns);
 
@@ -214,7 +226,8 @@ mod tests {
 
         assert!(result.is_ok());
         assert_eq!(db.tables.len(), 1);
-        assert_eq!(db.tables[0].name, "TestTable");
+        // assert_eq!(db.tables[0].name, "TestTable");
+        assert!(db.tables.contains_key("TestTable"));
 
         tokio::fs::remove_file("test_db.json").await.ok();
     }
@@ -276,7 +289,7 @@ mod tests {
         let db = Database {
             name: "test_db".to_string(),
             file_name: db_path.clone(),
-            tables: vec![],
+            tables: HashMap::new(),
         };
 
         db.save_to_file().await.expect("Failed to save database");
@@ -296,7 +309,7 @@ mod tests {
         let db = Database {
             name: "test_db".to_string(),
             file_name: db_path.to_string(),
-            tables: vec![],
+            tables: HashMap::new(),
         };
 
         db.save_to_file().await.expect("Failed to save database");

@@ -14,14 +14,14 @@ impl<'a> View<'a> {
     pub fn all_tables(&self) {
         println!("Database: {}", self.database.name);
 
-        for table in &self.database.tables {
+        for (_table_name, table) in &self.database.tables {
             self.display_table(table);
         }
     }
 
     /// Display a specific table by name
     pub fn single_table(&self, table_name: &str) {
-        if let Some(table) = self.database.tables.iter().find(|t| t.name == table_name) {
+        if let Some(table) = self.database.tables.get(table_name) {
             self.display_table(table);
         } else {
             println!("Table '{}' not found in the database.", table_name);
@@ -47,7 +47,7 @@ impl<'a> View<'a> {
         let mut column_widths: Vec<usize> = column_names.iter().map(|name| name.len()).collect();
 
         // Adjust column widths based on the content of each row
-        for row in &table.rows {
+        for (_id, row) in &table.rows {
             for (i, column) in table.columns.0.iter().enumerate() {
                 let value = row
                     .data
@@ -74,7 +74,7 @@ impl<'a> View<'a> {
         println!("{}", separator.join("-+-"));
 
         // Print each row of data
-        for row in &table.rows {
+        for (_id, row) in &table.rows {
             let row_data: Vec<String> = table
                 .columns
                 .0

@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tracing;
@@ -7,7 +9,7 @@ use crate::{Columns, Database, Row};
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct Table {
     pub(crate) name: String,
-    pub rows: Vec<Row>,
+    pub rows: HashMap<String, Row>, // Row ID -> Row
     pub columns: Columns,
 }
 
@@ -15,30 +17,53 @@ impl Table {
     pub fn new(name: String, columns: Columns) -> Self {
         Table {
             name,
-            rows: Vec::new(),
+            rows: HashMap::new(),
             columns,
         }
     }
 
     pub async fn add_row(&mut self, db: &mut Database, data: Value) {
         if let Some(table) = db.get_table_mut(&self.name) {
-            if data.is_array() {
-                if let Some(array) = data.as_array() {
-                    for item in array {
-                        table.rows.push(Row::new(item.clone()))
+            match table.process_data(data) {
+                Ok(_) => {
+                    if let Err(e) = db.save_to_file().await {
+                        tracing::error!("Failed to save to file: {}", e);
                     }
                 }
-            } else {
-                table.rows.push(Row::new(data))
-            }
-            match db.save_to_file().await {
-                Ok(_) => {}
-                Err(e) => {
-                    tracing::error!("Failed to save to file: {}", e);
+                Err(err) => {
+                    tracing::error!("Error adding row(s): {}", err);
                 }
             }
         } else {
             tracing::error!("Table {} not found", self.name);
+        }
+    }
+
+    fn process_data(&mut self, data: Value) -> Result<(), String> {
+        if let Some(array) = data.as_array() {
+            self.add_multiple_rows(array)?;
+        } else {
+            self.add_single_row(data)?;
+        }
+        Ok(())
+    }
+
+    fn add_multiple_rows(&mut self, rows: &[Value]) -> Result<(), String> {
+        for row in rows {
+            self.add_single_row(row.clone())?;
+        }
+        Ok(())
+    }
+
+    fn add_single_row(&mut self, row: Value) -> Result<(), String> {
+        if let Some(row_id) = row.get("id").and_then(Value::as_str) {
+            if self.rows.contains_key(row_id) {
+                return Err(format!("Row with id '{}' already exists", row_id));
+            }
+            self.rows.insert(row_id.to_string(), Row::new(row.clone()));
+            Ok(())
+        } else {
+            Err(format!("Row is missing an 'id' field: {:?}", row))
         }
     }
 }
@@ -72,9 +97,15 @@ mod tests {
         let row_data = json!({"id": "1", "name": "John Doe"});
         table.add_row(&mut db, row_data).await;
 
-        assert_eq!(db.tables[0].rows.len(), 1);
+        assert_eq!(db.tables.get("TestTable").unwrap().rows.len(), 1);
         assert_eq!(
-            db.tables[0].rows[0].data,
+            db.tables
+                .get("TestTable")
+                .unwrap()
+                .rows
+                .get("1")
+                .unwrap()
+                .data,
             json!({"id": "1", "name": "John Doe"})
         );
     }
@@ -94,13 +125,31 @@ mod tests {
         ]);
         table.add_row(&mut db, row_data).await;
 
-        assert_eq!(db.tables[0].rows.len(), 2);
+        println!(
+            "test tables: {:?}",
+            db.tables.get("TestTable").unwrap().rows
+        );
+        println!("db.tables: {:?}", db.tables);
+
+        assert_eq!(db.tables.get("TestTable").unwrap().rows.len(), 2);
         assert_eq!(
-            db.tables[0].rows[0].data,
+            db.tables
+                .get("TestTable")
+                .unwrap()
+                .rows
+                .get("1")
+                .unwrap()
+                .data,
             json!({"id": "1", "name": "John Doe"})
         );
         assert_eq!(
-            db.tables[0].rows[1].data,
+            db.tables
+                .get("TestTable")
+                .unwrap()
+                .rows
+                .get("2")
+                .unwrap()
+                .data,
             json!({"id": "2", "name": "Jane Doe"})
         );
     }

@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -60,15 +62,9 @@ impl Query {
             .clone()
             .ok_or_else(|| DatabaseError::TableNotFound("Table name not specified.".to_string()))?;
 
-        let table_index = db
-            .tables
-            .iter()
-            .position(|t| t.name == table_name)
-            .ok_or_else(|| {
-                DatabaseError::TableNotFound(format!("Table '{}' not found.", table_name))
-            })?;
-
-        let table = &mut db.tables[table_index];
+        let table = db.tables.get_mut(&table_name).ok_or_else(|| {
+            DatabaseError::TableNotFound(format!("Table '{}' not found.", table_name))
+        })?;
 
         match self.operation {
             Operation::Read => self.execute_select(table, key, value),
@@ -86,8 +82,6 @@ impl Query {
         }
     }
 
-    // #[cfg(feature = "async")]
-    // pub async fn execute_add(self) -> Result<(), DatabaseError> {
     pub async fn execute_add(self) -> Result<(), DatabaseError> {
         let mut db = Database::load_from_file(&self.db_file_name)
             .await
@@ -103,13 +97,20 @@ impl Query {
 
         let table = db
             .tables
-            .iter_mut()
-            .find(|t| t.name == table_name)
+            .get_mut(&table_name)
             .ok_or_else(|| DatabaseError::TableNotFound(table_name.clone()))?;
 
         if let Some(row_data) = self.row_data.clone() {
             table.columns.validate(row_data.clone())?;
-            table.rows.push(Row::new(row_data));
+
+            if let Some(row_id) = row_data.get("id").and_then(|id| id.as_str()) {
+                table.rows.insert(row_id.to_string(), Row::new(row_data));
+            } else {
+                return Err(DatabaseError::InvalidData(
+                    "No 'id' field provided for the new row.".to_string(),
+                ));
+            }
+
             db.save_to_file().await.map_err(DatabaseError::SaveError)?;
             Ok(())
         } else {
@@ -125,7 +126,7 @@ impl Query {
         key: &str,
         value: &str,
     ) -> Result<Option<T>, DatabaseError> {
-        for row in &table.rows {
+        for (_id, row) in &table.rows {
             if let Some(field_value) = row.data.get(key) {
                 if field_value.as_str() == Some(value) {
                     return serde_json::from_value(row.data.clone())
@@ -145,34 +146,17 @@ impl Query {
         key: &str,
         value: &str,
     ) -> Result<Option<T>, DatabaseError> {
-        // Find the row that matches the key-value pair
-        if let Some(row) = self.find_matching_row(table, key, value)? {
-            // Update the row with the provided data
-            self.apply_update_to_row(row, &self.update_data)?;
-
-            // Log and return the updated row
-            tracing::info!("Record updated successfully.");
-            return self.deserialize_row(row);
-        }
-
-        Ok(None) // No matching record found
-    }
-
-    // Helper: Find the matching row based on key-value pair
-    fn find_matching_row<'a>(
-        &self,
-        table: &'a mut Table,
-        key: &str,
-        value: &str,
-    ) -> Result<Option<&'a mut Row>, DatabaseError> {
-        for row in &mut table.rows {
+        for (_id, row) in &mut table.rows {
             if let Some(field_value) = row.data.get(key) {
                 if field_value.as_str() == Some(value) {
-                    return Ok(Some(row));
+                    self.apply_update_to_row(row, &self.update_data)?;
+
+                    tracing::info!("Record updated successfully.");
+                    return self.deserialize_row(row);
                 }
             }
         }
-        Ok(None)
+        Ok(None) // No matching record found
     }
 
     // Helper: Apply the update data to the row
@@ -199,7 +183,7 @@ impl Query {
             DatabaseError::InvalidData("Row data is not a JSON object.".to_string())
         })?;
 
-        for (k, v) in update_map {
+        for (k, v) in update_map.iter() {
             row_map.insert(k.clone(), v.clone());
         }
 
@@ -219,17 +203,28 @@ impl Query {
         key: &str,
         value: &str,
     ) -> Result<Option<T>, DatabaseError> {
-        for (i, row) in table.rows.iter().enumerate() {
+        // Identify the `_id` of the row to be deleted.
+        let target_id = table.rows.iter().find_map(|(id, row)| {
             if let Some(field_value) = row.data.get(key) {
                 if field_value.as_str() == Some(value) {
-                    let record = serde_json::from_value(row.data.clone())
-                        .map_err(|e| DatabaseError::JSONError(e))?;
-
-                    table.rows.remove(i);
-                    tracing::info!("Record deleted successfully.");
-                    return Ok(Some(record));
+                    return Some(id.clone());
                 }
             }
+            None
+        });
+
+        if let Some(target_id) = target_id {
+            // Remove the row and deserialize the record.
+            let row = table.rows.remove(&target_id).ok_or_else(|| {
+                DatabaseError::InvalidData(
+                    "Row unexpectedly not found during deletion.".to_string(),
+                )
+            })?;
+
+            let record =
+                serde_json::from_value(row.data).map_err(|e| DatabaseError::JSONError(e))?;
+            tracing::info!("Record deleted successfully.");
+            return Ok(Some(record));
         }
 
         Ok(None) // No matching record found
@@ -243,7 +238,7 @@ impl Query {
                 Database {
                     name: String::new(),
                     file_name: self.db_file_name.clone(),
-                    tables: Vec::new(),
+                    tables: HashMap::new(),
                 }
             });
         self.handle_all(&db) // Shared logic
@@ -251,10 +246,11 @@ impl Query {
 
     fn handle_all<T: DeserializeOwned>(&self, db: &Database) -> Vec<T> {
         if let Some(table_name) = &self.table_name {
-            if let Some(table) = db.tables.iter().find(|t| t.name == *table_name) {
+            if let Some(table) = db.tables.get(table_name) {
                 table
                     .rows
-                    .iter()
+                    .values()
+                    // .iter()
                     .filter_map(|row| serde_json::from_value(row.data.clone()).ok())
                     .collect()
             } else {
