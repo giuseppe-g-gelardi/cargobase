@@ -62,16 +62,6 @@ impl Query {
             .clone()
             .ok_or_else(|| DatabaseError::TableNotFound("Table name not specified.".to_string()))?;
 
-        // let table_index = db
-        //     .tables
-        //     .iter()
-        //     .position(|t| t.name == table_name)
-        //     .ok_or_else(|| {
-        //         DatabaseError::TableNotFound(format!("Table '{}' not found.", table_name))
-        //     })?;
-        //
-        // let table = &mut db.tables[table_index];
-
         let table = db.tables.get_mut(&table_name).ok_or_else(|| {
             DatabaseError::TableNotFound(format!("Table '{}' not found.", table_name))
         })?;
@@ -166,36 +156,8 @@ impl Query {
                 }
             }
         }
-        // // Find the row that matches the key-value pair
-        // if let Some(row) = self.find_matching_row(table, key, value)? {
-        //     // Update the row with the provided data
-        //     self.apply_update_to_row(row, &self.update_data)?;
-        //
-        //     // Log and return the updated row
-        //     tracing::info!("Record updated successfully.");
-        //     return self.deserialize_row(row);
-        // }
-
         Ok(None) // No matching record found
     }
-
-    // INFO: might not need this because we are using hashmaps
-    // Helper: Find the matching row based on key-value pair
-    // fn find_matching_row<'a>(
-    //     &self,
-    //     table: &'a mut Table,
-    //     key: &str,
-    //     value: &str,
-    // ) -> Result<Option<&'a mut Row>, DatabaseError> {
-    //     for row in table.rows.values_mut() {
-    //         if let Some(field_value) = row.data.get(key) {
-    //             if field_value.as_str() == Some(value) {
-    //                 return Ok(Some(row));
-    //             }
-    //         }
-    //     }
-    //     Ok(None)
-    // }
 
     // Helper: Apply the update data to the row
     fn apply_update_to_row(
@@ -221,7 +183,6 @@ impl Query {
             DatabaseError::InvalidData("Row data is not a JSON object.".to_string())
         })?;
 
-        // for (k, v) in update_map {
         for (k, v) in update_map.iter() {
             row_map.insert(k.clone(), v.clone());
         }
@@ -242,18 +203,6 @@ impl Query {
         key: &str,
         value: &str,
     ) -> Result<Option<T>, DatabaseError> {
-        // for (i, row) in table.rows.iter().enumerate() {
-        //     if let Some(field_value) = row.data.get(key) {
-        //         if field_value.as_str() == Some(value) {
-        //             let record = serde_json::from_value(row.data.clone())
-        //                 .map_err(|e| DatabaseError::JSONError(e))?;
-        //
-        //             table.rows.remove(i);
-        //             tracing::info!("Record deleted successfully.");
-        //             return Ok(Some(record));
-        //         }
-        //     }
-        // }
         // Identify the `_id` of the row to be deleted.
         let target_id = table.rows.iter().find_map(|(id, row)| {
             if let Some(field_value) = row.data.get(key) {
@@ -290,7 +239,6 @@ impl Query {
                     name: String::new(),
                     file_name: self.db_file_name.clone(),
                     tables: HashMap::new(),
-                    // tables: Vec::new(),
                 }
             });
         self.handle_all(&db) // Shared logic
@@ -298,7 +246,6 @@ impl Query {
 
     fn handle_all<T: DeserializeOwned>(&self, db: &Database) -> Vec<T> {
         if let Some(table_name) = &self.table_name {
-            // if let Some(table) = db.tables.iter().find(|t| t.name == *table_name) {
             if let Some(table) = db.tables.get(table_name) {
                 table
                     .rows

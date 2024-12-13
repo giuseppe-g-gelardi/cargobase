@@ -14,8 +14,7 @@ impl<'a> View<'a> {
     pub fn all_tables(&self) {
         println!("Database: {}", self.database.name);
 
-        for (table_name, table) in &self.database.tables {
-            println!("\nTable: {}", table_name);
+        for (_table_name, table) in &self.database.tables {
             self.display_table(table);
         }
     }
