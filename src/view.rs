@@ -1,4 +1,4 @@
-use super::{Database, Table};
+use crate::{Database, Table};
 
 pub struct View<'a> {
     database: &'a Database,

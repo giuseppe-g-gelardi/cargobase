@@ -24,3 +24,5 @@ cargobase.json
 cargobase-async.json
 
 .env
+
+NOTES.md
