@@ -210,10 +210,22 @@ impl Database {
 
         Ok(())
     }
+
+    pub fn count_rows(&self, table_name: &str) -> Result<usize, DatabaseError> {
+        if let Some(table) = self.tables.get(table_name) {
+            Ok(table.rows.len())
+        } else {
+            Err(DatabaseError::TableNotFound(format!(
+                "Table {} not found",
+                table_name.to_string()
+            )))
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use serde_json::json;
     use tracing_test::traced_test;
 
     use super::*;
@@ -388,6 +400,52 @@ mod tests {
 
         let result = db.rename_table("NonExistentTable", "NewTable").await;
 
+        assert!(matches!(result, Err(DatabaseError::TableNotFound(_))));
+    }
+
+    #[tokio::test]
+    async fn test_count_rows() {
+        #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+        pub struct User {
+            id: String,
+            name: String,
+            email: String,
+        }
+        let mut db = setup_temp_db().await;
+
+        let user_columns = Columns::from_struct::<User>(true);
+        //
+        let mut users_table = Table::new("users".to_string(), user_columns.clone());
+        db.add_table(&mut users_table)
+            .await
+            .expect("failed to add users table");
+
+        let user1 = json!({
+            "id": "1",
+            "name": "John Doe",
+            "email": "johndoe@example.com"
+        });
+        let user2 = json!({
+            "id": "2",
+            "name": "Jane Smith",
+            "email": "janesmith@example.com"
+        });
+        let user3 = json!({
+            "id": "3",
+            "name": "Alice Johnson",
+            "email": "alice@example.com"
+        });
+
+        users_table.add_row(&mut db, user1).await;
+        users_table.add_row(&mut db, user2).await;
+        users_table.add_row(&mut db, user3).await;
+
+        // Count rows in the table
+        let row_count = db.count_rows("users").unwrap();
+        assert_eq!(row_count, 3);
+
+        // Attempt to count rows for a non-existent table
+        let result = db.count_rows("NonExistentTable");
         assert!(matches!(result, Err(DatabaseError::TableNotFound(_))));
     }
 }

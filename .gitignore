@@ -24,7 +24,7 @@ cargobase.json
 cargobase-async.json
 cargobase-testing.json
 
-main.rs
+src/main.rs
 
 .env
 
