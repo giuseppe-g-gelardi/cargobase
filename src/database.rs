@@ -176,6 +176,40 @@ impl Database {
         let view = View::new(self);
         view.single_table(table_name);
     }
+
+    pub fn list_tables(&self) -> Vec<String> {
+        self.tables.keys().cloned().collect()
+    }
+
+    pub async fn rename_table(
+        &mut self,
+        old_name: &str,
+        new_name: &str,
+    ) -> Result<(), DatabaseError> {
+        if old_name == new_name {
+            return Err(DatabaseError::InvalidData(
+                "old name and new name are the same".to_string(),
+            ));
+        }
+
+        let table = self.tables.remove(old_name).ok_or_else(|| {
+            DatabaseError::TableNotFound(format!("Table {} not found", old_name.to_string()))
+        });
+
+        if self.tables.contains_key(new_name) {
+            return Err(DatabaseError::TableAlreadyExists(new_name.to_string()));
+        }
+
+        let mut table = table?;
+        table.name = new_name.to_string();
+        self.tables.insert(new_name.to_string(), table);
+
+        self.save_to_file()
+            .await
+            .map_err(DatabaseError::SaveError)?;
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -183,7 +217,7 @@ mod tests {
     use tracing_test::traced_test;
 
     use super::*;
-    use crate::{setup_temp_db, Columns, Table};
+    use crate::{setup_temp_db, Column, Columns, Table};
 
     #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
     struct TestData {
@@ -319,5 +353,41 @@ mod tests {
             .expect("Failed to load database");
 
         assert_eq!(db, loaded_db);
+    }
+
+    #[tokio::test]
+    async fn test_rename_table_success() {
+        let mut db = setup_temp_db().await;
+
+        db.rename_table("TestTable", "RenamedTable")
+            .await
+            .expect("Failed to rename table");
+
+        assert!(db.tables.contains_key("RenamedTable"));
+        assert!(!db.tables.contains_key("TestTable"));
+    }
+
+    #[tokio::test]
+    async fn test_rename_table_already_exists() {
+        let mut db = setup_temp_db().await;
+
+        let mut another_table = Table::new(
+            "AnotherTable".to_string(),
+            Columns::new(vec![Column::new("id", true)]),
+        );
+        db.add_table(&mut another_table).await.unwrap();
+
+        let result = db.rename_table("TestTable", "AnotherTable").await;
+
+        assert!(matches!(result, Err(DatabaseError::TableAlreadyExists(_))));
+    }
+
+    #[tokio::test]
+    async fn test_rename_table_not_found() {
+        let mut db = setup_temp_db().await;
+
+        let result = db.rename_table("NonExistentTable", "NewTable").await;
+
+        assert!(matches!(result, Err(DatabaseError::TableNotFound(_))));
     }
 }
