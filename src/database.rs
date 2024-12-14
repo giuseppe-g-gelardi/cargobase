@@ -104,7 +104,6 @@ impl Database {
     }
 
     pub(crate) fn get_table_mut(&mut self, table_name: &str) -> Option<&mut Table> {
-        // self.tables.get_mut(table_name)
         tracing::debug!("looking for table: {}", table_name);
         let table = self.tables.get_mut(table_name);
 
@@ -436,9 +435,15 @@ mod tests {
             "email": "alice@example.com"
         });
 
-        users_table.add_row(&mut db, user1).await;
-        users_table.add_row(&mut db, user2).await;
-        users_table.add_row(&mut db, user3).await;
+        let users = vec![user1, user2, user3];
+
+        // add single rows
+        // users_table.add_row(&mut db, user1).await;
+        // users_table.add_row(&mut db, user2).await;
+        // users_table.add_row(&mut db, user3).await;
+
+        // add array of rows.... .into() converts Vec<serde_json::Value> to Vec<Row>???
+        users_table.add_row(&mut db, users.into()).await;
 
         // Count rows in the table
         let row_count = db.count_rows("users").unwrap();
