@@ -104,7 +104,6 @@ impl Database {
     }
 
     pub(crate) fn get_table_mut(&mut self, table_name: &str) -> Option<&mut Table> {
-        // self.tables.get_mut(table_name)
         tracing::debug!("looking for table: {}", table_name);
         let table = self.tables.get_mut(table_name);
 
@@ -176,14 +175,60 @@ impl Database {
         let view = View::new(self);
         view.single_table(table_name);
     }
+
+    pub fn list_tables(&self) -> Vec<String> {
+        self.tables.keys().cloned().collect()
+    }
+
+    pub async fn rename_table(
+        &mut self,
+        old_name: &str,
+        new_name: &str,
+    ) -> Result<(), DatabaseError> {
+        if old_name == new_name {
+            return Err(DatabaseError::InvalidData(
+                "old name and new name are the same".to_string(),
+            ));
+        }
+
+        let table = self.tables.remove(old_name).ok_or_else(|| {
+            DatabaseError::TableNotFound(format!("Table {} not found", old_name.to_string()))
+        });
+
+        if self.tables.contains_key(new_name) {
+            return Err(DatabaseError::TableAlreadyExists(new_name.to_string()));
+        }
+
+        let mut table = table?;
+        table.name = new_name.to_string();
+        self.tables.insert(new_name.to_string(), table);
+
+        self.save_to_file()
+            .await
+            .map_err(DatabaseError::SaveError)?;
+
+        Ok(())
+    }
+
+    pub fn count_rows(&self, table_name: &str) -> Result<usize, DatabaseError> {
+        if let Some(table) = self.tables.get(table_name) {
+            Ok(table.rows.len())
+        } else {
+            Err(DatabaseError::TableNotFound(format!(
+                "Table {} not found",
+                table_name.to_string()
+            )))
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use serde_json::json;
     use tracing_test::traced_test;
 
     use super::*;
-    use crate::{setup_temp_db, Columns, Table};
+    use crate::{setup_temp_db, Column, Columns, Table};
 
     #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
     struct TestData {
@@ -319,5 +364,93 @@ mod tests {
             .expect("Failed to load database");
 
         assert_eq!(db, loaded_db);
+    }
+
+    #[tokio::test]
+    async fn test_rename_table_success() {
+        let mut db = setup_temp_db().await;
+
+        db.rename_table("TestTable", "RenamedTable")
+            .await
+            .expect("Failed to rename table");
+
+        assert!(db.tables.contains_key("RenamedTable"));
+        assert!(!db.tables.contains_key("TestTable"));
+    }
+
+    #[tokio::test]
+    async fn test_rename_table_already_exists() {
+        let mut db = setup_temp_db().await;
+
+        let mut another_table = Table::new(
+            "AnotherTable".to_string(),
+            Columns::new(vec![Column::new("id", true)]),
+        );
+        db.add_table(&mut another_table).await.unwrap();
+
+        let result = db.rename_table("TestTable", "AnotherTable").await;
+
+        assert!(matches!(result, Err(DatabaseError::TableAlreadyExists(_))));
+    }
+
+    #[tokio::test]
+    async fn test_rename_table_not_found() {
+        let mut db = setup_temp_db().await;
+
+        let result = db.rename_table("NonExistentTable", "NewTable").await;
+
+        assert!(matches!(result, Err(DatabaseError::TableNotFound(_))));
+    }
+
+    #[tokio::test]
+    async fn test_count_rows() {
+        #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+        pub struct User {
+            id: String,
+            name: String,
+            email: String,
+        }
+        let mut db = setup_temp_db().await;
+
+        let user_columns = Columns::from_struct::<User>(true);
+        //
+        let mut users_table = Table::new("users".to_string(), user_columns.clone());
+        db.add_table(&mut users_table)
+            .await
+            .expect("failed to add users table");
+
+        let user1 = json!({
+            "id": "1",
+            "name": "John Doe",
+            "email": "johndoe@example.com"
+        });
+        let user2 = json!({
+            "id": "2",
+            "name": "Jane Smith",
+            "email": "janesmith@example.com"
+        });
+        let user3 = json!({
+            "id": "3",
+            "name": "Alice Johnson",
+            "email": "alice@example.com"
+        });
+
+        let users = vec![user1, user2, user3];
+
+        // add single rows
+        // users_table.add_row(&mut db, user1).await;
+        // users_table.add_row(&mut db, user2).await;
+        // users_table.add_row(&mut db, user3).await;
+
+        // add array of rows.... .into() converts Vec<serde_json::Value> to Vec<Row>???
+        users_table.add_row(&mut db, users.into()).await;
+
+        // Count rows in the table
+        let row_count = db.count_rows("users").unwrap();
+        assert_eq!(row_count, 3);
+
+        // Attempt to count rows for a non-existent table
+        let result = db.count_rows("NonExistentTable");
+        assert!(matches!(result, Err(DatabaseError::TableNotFound(_))));
     }
 }
