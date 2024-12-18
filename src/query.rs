@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::path::PathBuf;
 
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -16,7 +17,7 @@ pub enum Operation {
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct Query {
-    pub db_file_name: String,
+    pub db_file_name: PathBuf,
     pub table_name: Option<String>,
     pub operation: Operation,
     pub update_data: Option<Value>,
@@ -283,7 +284,7 @@ mod tests {
     #[test]
     fn test_query_from() {
         let query = Query {
-            db_file_name: "test_db.json".to_string(),
+            db_file_name: "test_db.json".into(),
             table_name: None,
             operation: Operation::Read,
             update_data: None,
@@ -297,7 +298,7 @@ mod tests {
     #[test]
     fn test_query_data() {
         let query = Query {
-            db_file_name: "test_db.json".to_string(),
+            db_file_name: "test_db.json".into(),
             table_name: Some("TestTable".to_string()),
             operation: Operation::Update,
             update_data: None,
@@ -314,7 +315,7 @@ mod tests {
     fn test_query_data_from_struct() {
         std::fs::remove_file("test_db.json").ok();
         let query = Query {
-            db_file_name: "test_db.json".to_string(),
+            db_file_name: "test_db.json".into(),
             table_name: Some("TestTable".to_string()),
             operation: Operation::Create,
             update_data: None,
@@ -371,7 +372,7 @@ mod tests {
     #[test]
     fn test_query_set() {
         let query = Query {
-            db_file_name: "test_db.json".to_string(),
+            db_file_name: "test_db.json".into(),
             table_name: Some("TestTable".to_string()),
             operation: Operation::Update,
             update_data: None,

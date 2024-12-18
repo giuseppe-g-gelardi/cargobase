@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 use tracing;
@@ -8,8 +9,8 @@ use crate::{query::Operation, DatabaseError, Query, Table, View};
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct Database {
     pub(crate) name: String,
-    pub(crate) file_name: String,
-    pub(crate) tables: HashMap<String, Table>, // pub(crate) tables: Vec<Table>,
+    pub(crate) file_name: PathBuf,
+    pub(crate) tables: HashMap<String, Table>,
 }
 
 impl Database {
@@ -37,7 +38,7 @@ impl Database {
 
         Database {
             name,
-            file_name,
+            file_name: file_name.into(),
             tables: HashMap::new(), // tables: Vec::new(),
         }
     }
@@ -92,14 +93,19 @@ impl Database {
     pub(crate) async fn save_to_file(&self) -> Result<(), tokio::io::Error> {
         let json_data = serde_json::to_string_pretty(&self)?;
         tokio::fs::write(&self.file_name, json_data).await?;
-        tracing::info!("Database saved to file: {}", self.file_name);
+        tracing::info!("Database saved to file: {:?}", self.file_name);
         Ok(())
     }
 
-    pub(crate) async fn load_from_file(file_name: &str) -> Result<Self, tokio::io::Error> {
-        let json_data = tokio::fs::read_to_string(file_name).await?;
+    pub(crate) async fn load_from_file<P: AsRef<Path>>(
+        file_name: P,
+    ) -> Result<Self, tokio::io::Error> {
+        let json_data = tokio::fs::read_to_string(file_name.as_ref()).await?;
         let db: Database = serde_json::from_str(&json_data)?;
-        tracing::info!("Database loaded from file: {}", file_name);
+        tracing::info!(
+            "Database loaded from file: {:?}",
+            file_name.as_ref().display()
+        );
         Ok(db)
     }
 
@@ -244,7 +250,7 @@ mod tests {
         let fnn = format!("{db_name}.json");
 
         assert_eq!(db.name, db_name.to_string());
-        assert_eq!(db.file_name, fnn);
+        assert_eq!(db.file_name.to_string_lossy(), fnn);
         assert_eq!(db.tables.len(), 1); // the setup_temp_db function adds a table
     }
 
@@ -329,7 +335,8 @@ mod tests {
         use tempfile::NamedTempFile;
 
         let temp_file = NamedTempFile::new().expect("Failed to create a temporary file");
-        let db_path = temp_file.path().to_str().unwrap().to_string();
+        let db_path = temp_file.path().to_path_buf();
+        // let db_path = temp_file.path().to_str().unwrap().to_string();
 
         let db = Database {
             name: "test_db".to_string(),
@@ -349,11 +356,13 @@ mod tests {
         use tempfile::NamedTempFile;
 
         let temp_file = NamedTempFile::new().expect("Failed to create a temporary file");
-        let db_path = temp_file.path().to_str().unwrap().to_string();
+        let db_path = temp_file.path().to_path_buf();
+        // let db_path = temp_file.path().to_str().unwrap().to_string();
 
         let db = Database {
             name: "test_db".to_string(),
-            file_name: db_path.to_string(),
+            file_name: db_path.clone(),
+            // file_name: db_path.to_string(),
             tables: HashMap::new(),
         };
 
