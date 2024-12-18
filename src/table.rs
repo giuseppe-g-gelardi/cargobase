@@ -181,7 +181,8 @@ mod tests {
         db.add_table(&mut table).await.unwrap();
 
         // Simulate failure in saving
-        db.file_name = "/invalid/path.json".to_string();
+        db.file_name = "/invalid/path.json".into();
+
         let row_data = json!({"id": "1", "name": "John Doe"});
         table.add_row(&mut db, row_data).await;
 
