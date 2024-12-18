@@ -1,20 +1,17 @@
 pub mod query;
-pub mod table;
 pub mod util;
 pub mod view;
 
-pub mod columns;
 pub mod errors;
-pub mod row;
 
-pub mod database;
-pub use database::Database;
+pub mod database_components;
+pub use database_components::{Column, Columns, Row, Table};
 
-pub use columns::{Column, Columns};
+pub mod database_operations;
+pub use database_operations::Database;
+
 pub use errors::DatabaseError;
-pub use row::Row;
 
 pub use query::{Operation, Query};
-pub use table::Table;
 pub use util::setup_temp_db;
 pub use view::View;
