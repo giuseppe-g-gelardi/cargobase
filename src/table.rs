@@ -48,6 +48,11 @@ impl Table {
         Ok(())
     }
 
+    /*
+     * update this....
+     * automatucally convert to Value
+     * let _ = serde_json::to_value(&data).unwrap();
+     */
     fn add_multiple_rows(&mut self, rows: &[Value]) -> Result<(), String> {
         for row in rows {
             self.add_single_row(row.clone())?;
