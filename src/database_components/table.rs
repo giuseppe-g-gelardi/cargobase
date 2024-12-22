@@ -71,6 +71,38 @@ impl Table {
             Err(format!("Row is missing an 'id' field: {:?}", row))
         }
     }
+
+     pub fn add_row_with_fk(
+        &mut self,
+        db: &Database,
+        row_data: serde_json::Value,
+        fk_constraints: Option<&[(&str, &str)]>, // Vec of (Table, Column)
+    ) -> Result<(), String> {
+        // Validate FK constraints if provided
+        if let Some(constraints) = fk_constraints {
+            for (table_name, fk_column) in constraints {
+                if let Some(fk_value) = row_data.get(fk_column).and_then(|v| v.as_str()) {
+                    if !db.record_exists(table_name, fk_value) {
+                        return Err(format!(
+                            "Foreign key constraint failed: `{}` does not exist in `{}`",
+                            fk_value, table_name
+                        ));
+                    }
+                } else {
+                    return Err(format!("Missing value for foreign key column `{}`", fk_column));
+                }
+            }
+        }
+
+        // Add the row after validation
+        let row_id = row_data
+            .get("id")
+            .and_then(|id| id.as_str())
+            .ok_or_else(|| "Missing primary key `id` in row data".to_string())?;
+
+        self.rows.insert(row_id.to_string(), Row::new(row_data));
+        Ok(())
+    }
 }
 
 #[cfg(test)]

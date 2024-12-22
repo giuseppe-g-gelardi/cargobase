@@ -134,6 +134,14 @@ impl Database {
             )))
         }
     }
+
+    pub fn record_exists(&self, table_name: &str, pk_value: &str) -> bool {
+        if let Some(table) = self.tables.get(table_name) {
+            table.rows.contains_key(pk_value)
+        } else {
+            false
+        }
+    }
 }
 
 #[cfg(test)]
@@ -325,5 +333,66 @@ mod tests {
         // Attempt to count rows for a non-existent table
         let result = db.count_rows("NonExistentTable");
         assert!(matches!(result, Err(DatabaseError::TableNotFound(_))));
+    }
+
+    #[tokio::test]
+    async fn test_foreign_key_validation() {
+        #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+        struct Post {
+            id: String,
+            title: String,
+            content: String,
+            user_id: String,
+        }
+
+        #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+        struct User {
+            id: String,
+            name: String,
+            email: String,
+        }
+
+        let mut db = setup_temp_db().await;
+
+        // Set up User table
+        let user_columns = Columns::from_struct::<User>(true);
+        let mut users_table = Table::new("users".to_string(), user_columns.clone());
+        db.add_table(&mut users_table).await.unwrap();
+
+        let user1 = json!({
+            "id": "1",
+            "name": "John Doe",
+            "email": "johndoe@example.com"
+        });
+        users_table.add_row(&mut db, user1).await;
+
+        // Set up Post table
+        let post_columns = Columns::from_struct::<Post>(true);
+        let mut posts_table = Table::new("posts".to_string(), post_columns.clone());
+        db.add_table(&mut posts_table).await.unwrap();
+
+        let valid_post = json!({
+            "id": "101",
+            "title": "Valid Post",
+            "content": "Content",
+            "user_id": "1"
+        });
+
+        let invalid_post = json!({
+            "id": "102",
+            "title": "Invalid Post",
+            "content": "Content",
+            "user_id": "999"
+        });
+
+        // Valid FK
+        assert!(posts_table
+            .add_row_with_fk(&db, valid_post, Some(&[("users", "user_id")]))
+            .is_ok());
+
+        // Invalid FK
+        assert!(posts_table
+            .add_row_with_fk(&db, invalid_post, Some(&[("users", "user_id")]))
+            .is_err());
     }
 }
