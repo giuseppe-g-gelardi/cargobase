@@ -8,6 +8,7 @@ impl Database {
             operation: Operation::Create,
             update_data: None,
             row_data: None,
+            fk_constraints: None,
         }
     }
 
@@ -18,6 +19,7 @@ impl Database {
             operation: Operation::Read,
             update_data: None,
             row_data: None,
+            fk_constraints: None,
         }
     }
 
@@ -28,6 +30,7 @@ impl Database {
             operation: Operation::Read,
             update_data: None,
             row_data: None,
+            fk_constraints: None,
         }
     }
 
@@ -38,6 +41,7 @@ impl Database {
             operation: Operation::Delete,
             update_data: None,
             row_data: None,
+            fk_constraints: None,
         }
     }
 
@@ -48,6 +52,7 @@ impl Database {
             operation: Operation::Update,
             update_data: None,
             row_data: None,
+            fk_constraints: None,
         }
     }
 }

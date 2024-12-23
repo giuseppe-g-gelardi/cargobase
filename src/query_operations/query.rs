@@ -6,7 +6,28 @@ use serde_json::Value;
 
 use crate::{Database, DatabaseError, Operation, Query, Row, Table};
 
+use super::ForeignKeyConstraint;
+
 impl Query {
+    pub fn references(
+        mut self,
+        column_name: &str,
+        references_table: &str,
+        references_column: &str,
+    ) -> Self {
+        let fk = ForeignKeyConstraint {
+            column_name: column_name.to_string(),
+            references_table: references_table.to_string(),
+            references_column: references_column.to_string(),
+        };
+
+        match &mut self.fk_constraints {
+            Some(constraits) => constraits.push(fk),
+            None => self.fk_constraints = Some(vec![fk]),
+        }
+        self
+    }
+
     pub fn from(mut self, table_name: &str) -> Self {
         self.table_name = Some(table_name.to_string());
         self
@@ -69,23 +90,62 @@ impl Query {
         let mut db = Database::load_from_file(&self.db_file_name)
             .await
             .map_err(DatabaseError::LoadError)?;
-        self.handle_execute_add_sync(&mut db).await // Shared logic
+        self.handle_execute_add(&mut db).await // Shared logic
     }
 
-    async fn handle_execute_add_sync(&self, db: &mut Database) -> Result<(), DatabaseError> {
+    async fn handle_execute_add(&self, db: &mut Database) -> Result<(), DatabaseError> {
         let table_name = self
             .table_name
             .clone()
             .ok_or_else(|| DatabaseError::InvalidData("Table name not specified.".to_string()))?;
 
+        // Step 1: Validate foreign key constraints (immutable borrow)
+        if let Some(fk_constraints) = &self.fk_constraints {
+            for fk in fk_constraints {
+                // Get the value of the foreign key column from the row data
+                let fk_value = self
+                    .row_data
+                    .as_ref()
+                    .and_then(|data| data.get(&fk.column_name).and_then(|v| v.as_str()))
+                    .ok_or_else(|| {
+                        DatabaseError::InvalidData(format!(
+                            "Missing value for foreign key column `{}`",
+                            fk.column_name
+                        ))
+                    })?;
+
+                // Validate that the referenced table and column exist
+                let referenced_table = db.tables.get(&fk.references_table).ok_or_else(|| {
+                    DatabaseError::TableNotFound(format!(
+                        "Referenced table `{}` not found",
+                        fk.references_table
+                    ))
+                })?;
+
+                let fk_exists = referenced_table.rows.values().any(|row| {
+                    row.data.get(&fk.references_column).and_then(|v| v.as_str()) == Some(fk_value)
+                });
+
+                if !fk_exists {
+                    return Err(DatabaseError::InvalidData(format!(
+                        "Foreign key constraint failed: `{}` does not exist in `{}`",
+                        fk_value, fk.references_table
+                    )));
+                }
+            }
+        }
+
+        // Step 2: Borrow the table mutably to validate and insert data
         let table = db
             .tables
             .get_mut(&table_name)
             .ok_or_else(|| DatabaseError::TableNotFound(table_name.clone()))?;
 
         if let Some(row_data) = self.row_data.clone() {
+            // Validate the row data itself
             table.columns.validate(row_data.clone())?;
 
+            // Add the row to the table
             if let Some(row_id) = row_data.get("id").and_then(|id| id.as_str()) {
                 table.rows.insert(row_id.to_string(), Row::new(row_data));
             } else {
@@ -94,6 +154,7 @@ impl Query {
                 ));
             }
 
+            // Save the database to the file
             db.save_to_file().await.map_err(DatabaseError::SaveError)?;
             Ok(())
         } else {
@@ -256,7 +317,7 @@ mod tests {
     use serde::Deserialize;
     use serde_json::json;
 
-    use crate::setup_temp_db;
+    use crate::{setup_temp_db, Column, Columns};
 
     #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
     struct TestData {
@@ -272,6 +333,7 @@ mod tests {
             operation: Operation::Read,
             update_data: None,
             row_data: None,
+            fk_constraints: None,
         };
 
         let updated_query = query.from("TestTable");
@@ -286,6 +348,7 @@ mod tests {
             operation: Operation::Update,
             update_data: None,
             row_data: None,
+            fk_constraints: None,
         };
 
         let data = json!({ "name": "Updated Name" });
@@ -303,6 +366,7 @@ mod tests {
             operation: Operation::Create,
             update_data: None,
             row_data: None,
+            fk_constraints: None,
         };
 
         let test_data = TestData {
@@ -360,6 +424,7 @@ mod tests {
             operation: Operation::Update,
             update_data: None,
             row_data: None,
+            fk_constraints: None,
         };
 
         let data = json!({ "name": "Updated Name" });
@@ -496,5 +561,119 @@ mod tests {
 
         assert!(deleted_record.is_none(), "Expected record to be deleted");
         assert!(rows.is_empty(), "Expected all records to be deleted");
+    }
+
+    #[tokio::test]
+    async fn test_query_initialization() {
+        let query = Query {
+            db_file_name: "test_db.json".into(),
+            table_name: None,
+            operation: Operation::Create,
+            fk_constraints: None,
+            update_data: None,
+            row_data: None,
+        };
+
+        assert_eq!(query.table_name, None);
+        assert_eq!(query.fk_constraints, None);
+        if let Operation::Create = query.operation {
+            assert_eq!(query.update_data, None);
+        } else {
+            panic!("Expected operation to be `Create`");
+        }
+    }
+
+    #[test]
+    fn test_query_references() {
+        let query = Query {
+            db_file_name: "test_db.json".into(),
+            table_name: Some("ChildTable".to_string()),
+            operation: Operation::Create,
+            update_data: None,
+            row_data: None,
+            fk_constraints: None,
+        };
+
+        let updated_query = query.references("child_id", "ParentTable", "parent_id");
+
+        let expected_fk = ForeignKeyConstraint {
+            column_name: "child_id".to_string(),
+            references_table: "ParentTable".to_string(),
+            references_column: "parent_id".to_string(),
+        };
+
+        assert!(updated_query.fk_constraints.is_some());
+        assert!(updated_query.fk_constraints.unwrap().contains(&expected_fk));
+    }
+
+    #[tokio::test]
+    async fn test_execute_add_with_fk_constraints() {
+        let mut db = setup_temp_db().await;
+
+        db.add_table(&mut Table::new(
+            "ParentTable".to_string(),
+            Columns::new(vec![
+                Column::new("parent_id", true),
+                Column::new("name", false),
+            ]),
+        ))
+        .await
+        .expect("Failed to add parent table");
+
+        db.add_table(&mut Table::new(
+            "ChildTable".to_string(),
+            Columns::new(vec![
+                Column::new("child_id", true),
+                Column::new("name", false),
+                Column::new("parent_id", false),
+            ]),
+        ))
+        .await
+        .expect("Failed to add child table");
+
+        // Add a parent table and row
+        let parent_row = json!({ "parent_id": "1", "name": "Parent Row" });
+        let result = db
+            .add_row()
+            .from("ParentTable")
+            .data(parent_row.clone())
+            .execute_add()
+            .await;
+
+        assert!(
+            result.is_ok(),
+            "Expected successful row insertion with valid FK"
+        );
+
+        // Add a child row referencing the parent
+        let child_row = json!({ "child_id": "1", "name": "Child Row", "parent_id": "1" });
+        let result = db
+            .add_row()
+            .from("ChildTable")
+            .data(child_row.clone())
+            .references("parent_id", "ParentTable", "parent_id")
+            .execute_add()
+            .await;
+
+        assert!(
+            result.is_ok(),
+            "Expected successful row insertion with valid FK"
+        );
+
+        // Attempt to add a child row with an invalid FK
+        let invalid_child_row =
+            json!({ "child_id": "2", "name": "Child Row 2", "parent_id": "99" });
+        let result = db
+            .add_row()
+            .from("ChildTable")
+            .data(invalid_child_row)
+            .references("parent_id", "ParentTable", "parent_id")
+            .execute_add()
+            .await;
+
+        assert!(
+            result.is_err(),
+            "Expected failure due to invalid foreign key reference"
+        );
     }
 }
