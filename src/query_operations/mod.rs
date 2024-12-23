@@ -21,14 +21,16 @@ pub struct Query {
     pub operation: Operation,
     pub update_data: Option<Value>,
     pub row_data: Option<Value>,
+    pub fk_constraints: Option<Vec<ForeignKeyConstraint>>,
 }
-
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct ForeignKeyConstraint {
-    pub table_name: String,
     pub column_name: String,
-    pub foreign_table_name: String,
-    pub foreign_column_name: String,
+    pub references_table: String,
+    pub references_column: String,
+    // pub table_name: String,
+    // pub column_name: String,
+    // pub foreign_table_name: String,
+    // pub foreign_column_name: String,
 }
-
