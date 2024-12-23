@@ -31,4 +31,7 @@ pub enum DatabaseError {
 
     #[error("")] // could expand to specify serialization/deserialization error
     JSONError(#[from] serde_json::Error),
+
+    #[error("")] // could expand to specify serialization/deserialization Error
+    InvalidOperation(String),
 }

@@ -1,28 +1,10 @@
 use std::collections::HashMap;
-use std::path::PathBuf;
 
 use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use serde_json::Value;
 
-use crate::{Database, DatabaseError, Row, Table};
-
-#[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Copy)]
-pub enum Operation {
-    Create,
-    Read,
-    Update,
-    Delete,
-}
-
-#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
-pub struct Query {
-    pub db_file_name: PathBuf,
-    pub table_name: Option<String>,
-    pub operation: Operation,
-    pub update_data: Option<Value>,
-    pub row_data: Option<Value>,
-}
+use crate::{Database, DatabaseError, Operation, Query, Row, Table};
 
 impl Query {
     pub fn from(mut self, table_name: &str) -> Self {
@@ -271,6 +253,7 @@ impl Query {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde::Deserialize;
     use serde_json::json;
 
     use crate::setup_temp_db;
