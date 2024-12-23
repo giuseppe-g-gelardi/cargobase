@@ -22,3 +22,13 @@ pub struct Query {
     pub update_data: Option<Value>,
     pub row_data: Option<Value>,
 }
+
+
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+pub struct ForeignKeyConstraint {
+    pub table_name: String,
+    pub column_name: String,
+    pub foreign_table_name: String,
+    pub foreign_column_name: String,
+}
+

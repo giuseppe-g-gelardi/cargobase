@@ -69,10 +69,10 @@ impl Query {
         let mut db = Database::load_from_file(&self.db_file_name)
             .await
             .map_err(DatabaseError::LoadError)?;
-        self.handle_execute_add_sync(&mut db).await // Shared logic
+        self.handle_execute_add(&mut db).await // Shared logic
     }
 
-    async fn handle_execute_add_sync(&self, db: &mut Database) -> Result<(), DatabaseError> {
+    async fn handle_execute_add(&self, db: &mut Database) -> Result<(), DatabaseError> {
         let table_name = self
             .table_name
             .clone()
