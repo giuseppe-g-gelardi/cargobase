@@ -109,7 +109,7 @@ impl Query {
         key: &str,
         value: &str,
     ) -> Result<Option<T>, DatabaseError> {
-        for (_id, row) in &table.rows {
+        for row in table.rows.values() {
             if let Some(field_value) = row.data.get(key) {
                 if field_value.as_str() == Some(value) {
                     return serde_json::from_value(row.data.clone())
@@ -129,7 +129,7 @@ impl Query {
         key: &str,
         value: &str,
     ) -> Result<Option<T>, DatabaseError> {
-        for (_id, row) in &mut table.rows {
+        for row in table.rows.values_mut() {
             if let Some(field_value) = row.data.get(key) {
                 if field_value.as_str() == Some(value) {
                     self.apply_update_to_row(row, &self.update_data)?;
@@ -205,7 +205,7 @@ impl Query {
             })?;
 
             let record =
-                serde_json::from_value(row.data).map_err(|e| DatabaseError::JSONError(e))?;
+                serde_json::from_value(row.data).map_err(DatabaseError::JSONError)?;
             tracing::info!("Record deleted successfully.");
             return Ok(Some(record));
         }

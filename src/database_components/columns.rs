@@ -94,7 +94,7 @@ mod tests {
     fn test_column_new() {
         let column = Column::new("name", true);
         assert_eq!(column.name, "name");
-        assert_eq!(column.required, true);
+        assert!(column.required);
     }
 
     #[test]
@@ -102,9 +102,9 @@ mod tests {
         let columns = Columns::new(vec![Column::new("name", true), Column::new("age", false)]);
         assert_eq!(columns.0.len(), 2);
         assert_eq!(columns.0[0].name, "name");
-        assert_eq!(columns.0[0].required, true);
+        assert!(columns.0[0].required);
         assert_eq!(columns.0[1].name, "age");
-        assert_eq!(columns.0[1].required, false);
+        assert!(!columns.0[1].required);
     }
 
     #[test]

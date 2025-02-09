@@ -5,7 +5,7 @@ impl Database {
         tracing::debug!("looking for table: {}", table_name);
         let table = self.tables.get_mut(table_name);
 
-        if let Some(_) = table {
+        if table.is_some() {
             tracing::debug!("table found: {}", table_name);
         } else {
             tracing::error!("table not found: {}", table_name);

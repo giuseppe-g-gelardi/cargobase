@@ -14,7 +14,7 @@ impl<'a> View<'a> {
     pub fn all_tables(&self) {
         println!("Database: {}", self.database.name);
 
-        for (_table_name, table) in &self.database.tables {
+        for table in self.database.tables.values() {
             self.display_table(table);
         }
     }
@@ -47,7 +47,7 @@ impl<'a> View<'a> {
         let mut column_widths: Vec<usize> = column_names.iter().map(|name| name.len()).collect();
 
         // Adjust column widths based on the content of each row
-        for (_id, row) in &table.rows {
+        for row in table.rows.values() {
             for (i, column) in table.columns.0.iter().enumerate() {
                 let value = row
                     .data
@@ -74,7 +74,7 @@ impl<'a> View<'a> {
         println!("{}", separator.join("-+-"));
 
         // Print each row of data
-        for (_id, row) in &table.rows {
+        for row in table.rows.values() {
             let row_data: Vec<String> = table
                 .columns
                 .0

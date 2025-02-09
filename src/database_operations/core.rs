@@ -57,20 +57,20 @@ impl Database {
         self.tables.insert(table.name.clone(), table.clone());
         self.save_to_file()
             .await
-            .map_err(|e| DatabaseError::SaveError(e))?;
+            .map_err(DatabaseError::SaveError)?;
         Ok(())
     }
 
     pub async fn drop_table(&mut self, table_name: &str) -> Result<(), DatabaseError> {
         let mut db = Database::load_from_file(&self.file_name)
             .await
-            .map_err(|e| DatabaseError::LoadError(e))?;
+            .map_err(DatabaseError::LoadError)?;
 
         if let Some(removed_table) = db.tables.remove(table_name) {
             tracing::info!("Table `{}` dropped successfully", removed_table.name);
             db.save_to_file()
                 .await
-                .map_err(|e| DatabaseError::SaveError(e))?;
+                .map_err(DatabaseError::SaveError)?;
 
             self.tables = db.tables;
             Ok(())
@@ -106,7 +106,7 @@ impl Database {
         }
 
         let table = self.tables.remove(old_name).ok_or_else(|| {
-            DatabaseError::TableNotFound(format!("Table {} not found", old_name.to_string()))
+            DatabaseError::TableNotFound(format!("Table {} not found", old_name))
         });
 
         if self.tables.contains_key(new_name) {
@@ -130,7 +130,7 @@ impl Database {
         } else {
             Err(DatabaseError::TableNotFound(format!(
                 "Table {} not found",
-                table_name.to_string()
+                table_name
             )))
         }
     }

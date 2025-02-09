@@ -29,7 +29,7 @@ mod tests {
     #[test]
     fn test_row_id() {
         let row = Row::new(serde_json::json!({"name": "John Doe", "age": 30}));
-        assert_eq!(Uuid::parse_str(&row._id).is_ok(), true);
+        assert!(Uuid::parse_str(&row._id).is_ok());
     }
 
     #[test]
