@@ -22,11 +22,11 @@ impl Query {
         self
     }
 
-    pub async fn where_eq<T: DeserializeOwned + Default>(
-        self,
-        key: &str,
-        value: &str,
-    ) -> Result<Option<T>, DatabaseError> {
+    // pub async fn where_eq<T: DeserializeOwned + Default>(
+    pub async fn where_eq<T>(self, key: &str, value: &str) -> Result<Option<T>, DatabaseError>
+    where
+        T: DeserializeOwned + Default,
+    {
         let mut db = Database::load_from_file(&self.db_file_name)
             .await
             .map_err(DatabaseError::LoadError)?;
@@ -34,12 +34,15 @@ impl Query {
     }
 
     // Shared logic for where_eq
-    async fn handle_where_eq<T: DeserializeOwned + Default>(
+    async fn handle_where_eq<T>(
         &self,
         db: &mut Database,
         key: &str,
         value: &str,
-    ) -> Result<Option<T>, DatabaseError> {
+    ) -> Result<Option<T>, DatabaseError>
+    where
+        T: DeserializeOwned + Default,
+    {
         let table_name = self
             .table_name
             .clone()
@@ -103,12 +106,15 @@ impl Query {
         }
     }
 
-    fn execute_select<T: DeserializeOwned>(
+    fn execute_select<T>(
         &self,
         table: &Table,
         key: &str,
         value: &str,
-    ) -> Result<Option<T>, DatabaseError> {
+    ) -> Result<Option<T>, DatabaseError>
+    where
+        T: DeserializeOwned,
+    {
         for row in table.rows.values() {
             if let Some(field_value) = row.data.get(key) {
                 if field_value.as_str() == Some(value) {
@@ -123,12 +129,15 @@ impl Query {
         Ok(None) // No matching record found
     }
 
-    fn execute_update<T: DeserializeOwned>(
+    fn execute_update<T>(
         &self,
         table: &mut Table,
         key: &str,
         value: &str,
-    ) -> Result<Option<T>, DatabaseError> {
+    ) -> Result<Option<T>, DatabaseError>
+    where
+        T: DeserializeOwned,
+    {
         for row in table.rows.values_mut() {
             if let Some(field_value) = row.data.get(key) {
                 if field_value.as_str() == Some(value) {
@@ -174,18 +183,24 @@ impl Query {
     }
 
     // Helper: Deserialize the updated row
-    fn deserialize_row<T: DeserializeOwned>(&self, row: &Row) -> Result<Option<T>, DatabaseError> {
+    fn deserialize_row<T>(&self, row: &Row) -> Result<Option<T>, DatabaseError>
+    where
+        T: DeserializeOwned,
+    {
         serde_json::from_value(row.data.clone())
             .map(Some)
             .map_err(|e| DatabaseError::InvalidData(format!("Deserialization error: {}", e)))
     }
 
-    fn execute_delete<T: DeserializeOwned>(
+    fn execute_delete<T>(
         &self,
         table: &mut Table,
         key: &str,
         value: &str,
-    ) -> Result<Option<T>, DatabaseError> {
+    ) -> Result<Option<T>, DatabaseError>
+    where
+        T: DeserializeOwned,
+    {
         // Identify the `_id` of the row to be deleted.
         let target_id = table.rows.iter().find_map(|(id, row)| {
             if let Some(field_value) = row.data.get(key) {
@@ -204,8 +219,7 @@ impl Query {
                 )
             })?;
 
-            let record =
-                serde_json::from_value(row.data).map_err(DatabaseError::JSONError)?;
+            let record = serde_json::from_value(row.data).map_err(DatabaseError::JSONError)?;
             tracing::info!("Record deleted successfully.");
             return Ok(Some(record));
         }
@@ -213,7 +227,10 @@ impl Query {
         Ok(None) // No matching record found
     }
 
-    pub async fn all<T: DeserializeOwned>(&self) -> Vec<T> {
+    pub async fn all<T>(&self) -> Vec<T>
+    where
+        T: DeserializeOwned,
+    {
         let db = Database::load_from_file(&self.db_file_name)
             .await
             .unwrap_or_else(|e| {
@@ -227,7 +244,10 @@ impl Query {
         self.handle_all(&db) // Shared logic
     }
 
-    fn handle_all<T: DeserializeOwned>(&self, db: &Database) -> Vec<T> {
+    fn handle_all<T>(&self, db: &Database) -> Vec<T>
+    where
+        T: DeserializeOwned,
+    {
         if let Some(table_name) = &self.table_name {
             if let Some(table) = db.tables.get(table_name) {
                 table

@@ -30,7 +30,10 @@ impl Columns {
     }
 
     // remove required ??
-    pub fn from_struct<T: Serialize + DeserializeOwned + Default>(required: bool) -> Self {
+    pub fn from_struct<T>(required: bool) -> Self
+    where
+        T: Serialize + DeserializeOwned + Default,
+    {
         // Initialize the reflection tracer
         let mut tracer = Tracer::new(TracerConfig::default());
         tracer

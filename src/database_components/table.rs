@@ -72,7 +72,7 @@ impl Table {
         }
     }
 
-     pub fn add_row_with_fk(
+    pub fn add_row_with_fk(
         &mut self,
         db: &Database,
         row_data: serde_json::Value,
@@ -89,7 +89,10 @@ impl Table {
                         ));
                     }
                 } else {
-                    return Err(format!("Missing value for foreign key column `{}`", fk_column));
+                    return Err(format!(
+                        "Missing value for foreign key column `{}`",
+                        fk_column
+                    ));
                 }
             }
         }

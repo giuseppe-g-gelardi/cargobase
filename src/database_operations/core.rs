@@ -1,7 +1,8 @@
 use std::collections::HashMap;
+use std::path::Path;
 use tracing;
 
-use crate::{Database, DatabaseError, Table, View};
+use crate::{Database, DatabaseError, Operation, Query, Table, View};
 
 impl Database {
     pub async fn new(name: &str) -> Self {
@@ -68,9 +69,7 @@ impl Database {
 
         if let Some(removed_table) = db.tables.remove(table_name) {
             tracing::info!("Table `{}` dropped successfully", removed_table.name);
-            db.save_to_file()
-                .await
-                .map_err(DatabaseError::SaveError)?;
+            db.save_to_file().await.map_err(DatabaseError::SaveError)?;
 
             self.tables = db.tables;
             Ok(())
@@ -105,9 +104,10 @@ impl Database {
             ));
         }
 
-        let table = self.tables.remove(old_name).ok_or_else(|| {
-            DatabaseError::TableNotFound(format!("Table {} not found", old_name))
-        });
+        let table = self
+            .tables
+            .remove(old_name)
+            .ok_or_else(|| DatabaseError::TableNotFound(format!("Table {} not found", old_name)));
 
         if self.tables.contains_key(new_name) {
             return Err(DatabaseError::TableAlreadyExists(new_name.to_string()));
@@ -140,6 +140,89 @@ impl Database {
             table.rows.contains_key(pk_value)
         } else {
             false
+        }
+    }
+
+    pub(crate) async fn save_to_file(&self) -> Result<(), tokio::io::Error> {
+        let json_data = serde_json::to_string_pretty(&self)?;
+        tokio::fs::write(&self.file_name, json_data).await?;
+        tracing::info!("Database saved to file: {:?}", self.file_name);
+        Ok(())
+    }
+
+    pub(crate) async fn load_from_file<P: AsRef<Path>>(
+        file_name: P,
+    ) -> Result<Self, tokio::io::Error> {
+        let json_data = tokio::fs::read_to_string(file_name.as_ref()).await?;
+        let db: Database = serde_json::from_str(&json_data)?;
+        tracing::info!(
+            "Database loaded from file: {:?}",
+            file_name.as_ref().display()
+        );
+        Ok(db)
+    }
+
+    pub(crate) fn get_table_mut(&mut self, table_name: &str) -> Option<&mut Table> {
+        tracing::debug!("looking for table: {}", table_name);
+        let table = self.tables.get_mut(table_name);
+
+        if table.is_some() {
+            tracing::debug!("table found: {}", table_name);
+        } else {
+            tracing::error!("table not found: {}", table_name);
+        }
+        table
+    }
+}
+
+impl Database {
+    pub fn add_row(&mut self) -> Query {
+        Query {
+            db_file_name: self.file_name.clone(),
+            table_name: None,
+            operation: Operation::Create,
+            update_data: None,
+            row_data: None,
+        }
+    }
+
+    pub fn get_rows(&self) -> Query {
+        Query {
+            db_file_name: self.file_name.clone(),
+            table_name: None,
+            operation: Operation::Read,
+            update_data: None,
+            row_data: None,
+        }
+    }
+
+    pub fn get_single(&self) -> Query {
+        Query {
+            db_file_name: self.file_name.clone(),
+            table_name: None,
+            operation: Operation::Read,
+            update_data: None,
+            row_data: None,
+        }
+    }
+
+    pub fn delete_single(&self) -> Query {
+        Query {
+            db_file_name: self.file_name.clone(),
+            table_name: None,
+            operation: Operation::Delete,
+            update_data: None,
+            row_data: None,
+        }
+    }
+
+    pub fn update_row(&self) -> Query {
+        Query {
+            db_file_name: self.file_name.clone(),
+            table_name: None,
+            operation: Operation::Update,
+            update_data: None,
+            row_data: None,
         }
     }
 }
@@ -394,5 +477,121 @@ mod tests {
         assert!(posts_table
             .add_row_with_fk(&db, invalid_post, Some(&[("users", "user_id")]))
             .is_err());
+    }
+
+    #[tokio::test]
+    async fn test_save_to_file() {
+        use tempfile::NamedTempFile;
+
+        let temp_file = NamedTempFile::new().expect("Failed to create a temporary file");
+        let db_path = temp_file.path().to_path_buf();
+
+        let db = Database {
+            name: "test_db".to_string(),
+            file_name: db_path.clone(),
+            tables: HashMap::new(),
+        };
+
+        db.save_to_file().await.expect("Failed to save database");
+        let loaded_db = Database::load_from_file(&db_path)
+            .await
+            .expect("Failed to load database");
+        assert_eq!(db, loaded_db);
+    }
+
+    #[tokio::test]
+    async fn test_load_from_file() {
+        use tempfile::NamedTempFile;
+
+        let temp_file = NamedTempFile::new().expect("Failed to create a temporary file");
+        let db_path = temp_file.path().to_path_buf();
+
+        let db = Database {
+            name: "test_db".to_string(),
+            file_name: db_path.clone(),
+            tables: HashMap::new(),
+        };
+
+        db.save_to_file().await.expect("Failed to save database");
+
+        let loaded_db = Database::load_from_file(&db_path)
+            .await
+            .expect("Failed to load database");
+
+        assert_eq!(db, loaded_db);
+    }
+
+    #[tokio::test]
+    async fn test_get_table_mut() {
+        let mut db = setup_temp_db().await;
+        let test_columns = crate::Columns::from_struct::<TestData>(true);
+
+        let mut table = Table::new("test_table_mut".to_string(), test_columns.clone());
+        db.add_table(&mut table)
+            .await
+            .expect("failed to add test_table_mut");
+
+        let table = db.get_table_mut("test_table_mut");
+        assert!(table.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_add_row() {
+        let mut db = Database {
+            name: "test_db".to_string(),
+            file_name: "test_db.json".into(),
+            tables: HashMap::new(),
+        };
+
+        let query = db.add_row();
+        assert_eq!(query.operation, Operation::Create);
+    }
+
+    #[tokio::test]
+    async fn test_get_rows() {
+        let db = Database {
+            name: "test_db".to_string(),
+            file_name: "test_db.json".into(),
+            tables: HashMap::new(),
+        };
+
+        let query = db.get_rows();
+        assert_eq!(query.operation, Operation::Read);
+    }
+
+    #[tokio::test]
+    async fn test_get_single() {
+        let db = Database {
+            name: "test_db".to_string(),
+            file_name: "test_db.json".into(),
+            tables: HashMap::new(),
+        };
+
+        let query = db.get_single();
+        assert_eq!(query.operation, Operation::Read);
+    }
+
+    #[tokio::test]
+    async fn test_delete_single() {
+        let db = Database {
+            name: "test_db".to_string(),
+            file_name: "test_db.json".into(),
+            tables: HashMap::new(),
+        };
+
+        let query = db.delete_single();
+        assert_eq!(query.operation, Operation::Delete);
+    }
+
+    #[tokio::test]
+    async fn test_update_row() {
+        let db = Database {
+            name: "test_db".to_string(),
+            file_name: "test_db.json".into(),
+            tables: HashMap::new(),
+        };
+
+        let query = db.update_row();
+        assert_eq!(query.operation, Operation::Update);
     }
 }
