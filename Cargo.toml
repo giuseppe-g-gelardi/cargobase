@@ -29,3 +29,10 @@ tracing-test = "0.2.5"
 [lib]
 path = "src/lib.rs"
 
+[workspace]
+members = ["examples/*"]
+
+[[test]]
+name = "core"
+path = "tests/core.rs"
+

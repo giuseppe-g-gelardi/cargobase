@@ -8,7 +8,7 @@ use std::path::PathBuf;
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct Database {
-    pub(crate) name: String,
-    pub(crate) file_name: PathBuf,
-    pub(crate) tables: HashMap<String, Table>,
+    pub name: String,
+    pub file_name: PathBuf,
+    pub tables: HashMap<String, Table>,
 }
