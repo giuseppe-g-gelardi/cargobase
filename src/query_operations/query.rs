@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt;
 
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -958,5 +959,236 @@ mod tests {
         assert_eq!(results[0].name, "Alice");
         assert_eq!(results[1].name, "Bob");
         assert_eq!(results[2].name, "Charlie");
+    }
+
+    #[test]
+    fn test_display_comparison_op() {
+        use crate::ComparisonOp;
+        assert_eq!(format!("{}", ComparisonOp::Eq), "=");
+        assert_eq!(format!("{}", ComparisonOp::Ne), "!=");
+        assert_eq!(format!("{}", ComparisonOp::Gt), ">");
+        assert_eq!(format!("{}", ComparisonOp::Gte), ">=");
+        assert_eq!(format!("{}", ComparisonOp::Lt), "<");
+        assert_eq!(format!("{}", ComparisonOp::Lte), "<=");
+        assert_eq!(format!("{}", ComparisonOp::Like), "LIKE");
+        assert_eq!(format!("{}", ComparisonOp::In), "IN");
+        assert_eq!(format!("{}", ComparisonOp::NotIn), "NOT IN");
+    }
+
+    #[test]
+    fn test_display_logical_op() {
+        use crate::LogicalOp;
+        assert_eq!(format!("{}", LogicalOp::And), "AND");
+        assert_eq!(format!("{}", LogicalOp::Or), "OR");
+    }
+
+    #[test]
+    fn test_display_sort_order() {
+        use crate::SortOrder;
+        assert_eq!(format!("{}", SortOrder::Asc), "ASC");
+        assert_eq!(format!("{}", SortOrder::Desc), "DESC");
+    }
+
+    #[test]
+    fn test_display_condition() {
+        use crate::{Condition, ComparisonOp};
+        use serde_json::json;
+
+        // Simple equality
+        let cond = Condition::new("age", ComparisonOp::Eq, json!(30));
+        assert_eq!(format!("{}", cond), "age = 30");
+
+        // String value
+        let cond = Condition::new("name", ComparisonOp::Like, json!("John%"));
+        assert_eq!(format!("{}", cond), "name LIKE 'John%'");
+
+        // Greater than
+        let cond = Condition::new("score", ComparisonOp::Gt, json!(100));
+        assert_eq!(format!("{}", cond), "score > 100");
+
+        // IN with array
+        let cond = Condition::new("status", ComparisonOp::In, json!(["active", "pending"]));
+        assert_eq!(format!("{}", cond), "status IN ('active', 'pending')");
+
+        // NOT IN with numbers
+        let cond = Condition::new("id", ComparisonOp::NotIn, json!([1, 2, 3]));
+        assert_eq!(format!("{}", cond), "id NOT IN (1, 2, 3)");
+    }
+
+    #[tokio::test]
+    async fn test_display_database() {
+        use crate::util::setup_temp_db;
+
+        let mut db = setup_temp_db().await;
+        
+        // setup_temp_db creates a TestTable, so we have 1 table
+        let display = format!("{}", db);
+        assert!(display.contains("Database"));
+        assert!(display.contains("1 tables"));
+        assert!(display.contains("TestTable"));
+
+        // Add another table
+        let columns = crate::Columns::from_struct::<Person>(true);
+        let mut table = crate::Table::new("users".to_string(), columns);
+        db.add_table(&mut table).await.unwrap();
+
+        let display = format!("{}", db);
+        assert!(display.contains("Database"));
+        assert!(display.contains("2 tables"));
+        assert!(display.contains("users"));
+    }
+
+    #[tokio::test]
+    async fn test_display_table() {
+        use crate::util::setup_temp_db;
+
+        let mut db = setup_temp_db().await;
+        let columns = crate::Columns::from_struct::<Person>(true);
+        let mut table = crate::Table::new("people".to_string(), columns.clone());
+
+        // Empty table
+        let display = format!("{}", table);
+        assert!(display.contains("Table 'people'"));
+        assert!(display.contains("0 rows"));
+        assert!(display.contains(&format!("{} columns", columns.0.len())));
+
+        // Add table to db and add rows
+        db.add_table(&mut table).await.unwrap();
+        
+        db.add_row()
+            .from("people")
+            .data_from_struct(Person {
+                id: "1".to_string(),
+                name: "Alice".to_string(),
+                age: 30,
+                status: "active".to_string(),
+            })
+            .execute_add()
+            .await
+            .unwrap();
+
+        // Get updated table reference
+        db.reload().await.unwrap();
+        let display = format!("{}", db.tables.get("people").unwrap());
+        assert!(display.contains("Table 'people'"));
+        assert!(display.contains("1 rows"));
+    }
+
+    #[tokio::test]
+    async fn test_display_query() {
+        use crate::util::setup_temp_db;
+
+        let db = setup_temp_db().await;
+
+        // Simple query
+        let query = db.get_rows().from("users");
+        let display = format!("{}", query);
+        assert!(display.contains("Query["));
+        assert!(display.contains("table: users"));
+        assert!(display.contains("op: Read"));
+
+        // Query with conditions
+        let query = db
+            .get_rows()
+            .from("users")
+            .where_gt("age", 25)
+            .where_lt("age", 65);
+        let display = format!("{}", query);
+        assert!(display.contains("where:"));
+        assert!(display.contains("age > 25"));
+        assert!(display.contains("age < 65"));
+
+        // Query with ordering
+        let query = db
+            .get_rows()
+            .from("users")
+            .order_by("name", crate::SortOrder::Asc)
+            .order_by("age", crate::SortOrder::Desc);
+        let display = format!("{}", query);
+        assert!(display.contains("order:"));
+        assert!(display.contains("name ASC"));
+        assert!(display.contains("age DESC"));
+
+        // Query with limit and offset
+        let query = db
+            .get_rows()
+            .from("users")
+            .limit(10)
+            .offset(20);
+        let display = format!("{}", query);
+        assert!(display.contains("limit: 10"));
+        assert!(display.contains("offset: 20"));
+
+        // Complex query
+        let query = db
+            .get_rows()
+            .from("orders")
+            .where_gte("total", 100)
+            .where_ne("status", "cancelled")
+            .order_by("created_at", crate::SortOrder::Desc)
+            .limit(50);
+        let display = format!("{}", query);
+        assert!(display.contains("table: orders"));
+        assert!(display.contains("total >= 100"));
+        assert!(display.contains("status != 'cancelled'"));
+        assert!(display.contains("created_at DESC"));
+        assert!(display.contains("limit: 50"));
+    }
+}
+
+impl fmt::Display for Query {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Query[")?;
+        
+        // Table name
+        if let Some(ref table) = self.table_name {
+            write!(f, "table: {}", table)?;
+        } else {
+            write!(f, "table: <none>")?;
+        }
+        
+        // Operation type
+        write!(f, ", op: {:?}", self.operation)?;
+        
+        // Conditions
+        if !self.conditions.is_empty() {
+            write!(f, ", where: ")?;
+            for (i, group) in self.conditions.iter().enumerate() {
+                if i > 0 {
+                    write!(f, " {} ", group.operator)?;
+                }
+                write!(f, "(")?;
+                for (j, cond) in group.conditions.iter().enumerate() {
+                    if j > 0 {
+                        write!(f, " {} ", group.operator)?;
+                    }
+                    write!(f, "{}", cond)?;
+                }
+                write!(f, ")")?;
+            }
+        }
+        
+        // Order by
+        if !self.order_by.is_empty() {
+            write!(f, ", order: ")?;
+            for (i, (field, order)) in self.order_by.iter().enumerate() {
+                if i > 0 {
+                    write!(f, ", ")?;
+                }
+                write!(f, "{} {}", field, order)?;
+            }
+        }
+        
+        // Limit
+        if let Some(limit) = self.limit {
+            write!(f, ", limit: {}", limit)?;
+        }
+        
+        // Offset
+        if let Some(offset) = self.offset {
+            write!(f, ", offset: {}", offset)?;
+        }
+        
+        write!(f, "]")
     }
 }

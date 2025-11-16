@@ -19,6 +19,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create a new database
     let mut db = Database::new(Cow::Borrowed("example_db")).await;
     println!("✅ Created database: {}", db.name);
+    println!("   Display: {}\n", db);
 
     // Define schema with columns
     let user_columns = Columns::new(vec![
@@ -78,12 +79,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Reload to sync in-memory state
     db.reload().await?;
+    println!("   Database after inserts: {}", db);
 
     println!("\n📊 Database Operations Demo:\n");
 
     // 1. Get all users
     println!("1️⃣  Get all users:");
-    let all_users: Vec<User> = db.get_rows().from("users").all().await;
+    let query = db.get_rows().from("users");
+    println!("   Query: {}", query);
+    let all_users: Vec<User> = query.all().await;
     println!("   Found {} users", all_users.len());
 
     // 2. Find a specific user
@@ -128,12 +132,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 6. Advanced Query: Find users over 30
     println!("\n6️⃣  Find users over 30 years old:");
-    let seniors: Vec<User> = db
+    let query = db
         .get_rows()
         .from("users")
-        .where_gt("age", json!(30))
-        .all()
-        .await;
+        .where_gt("age", json!(30));
+    println!("   Query: {}", query);
+    let seniors: Vec<User> = query.all().await;
     println!("   Found {} users over 30:", seniors.len());
     for user in &seniors {
         println!("     - {} (age: {})", user.name, user.age);
@@ -141,14 +145,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 7. Advanced Query: Active users between 25-40, sorted by age
     println!("\n7️⃣  Find active users aged 25-40, sorted by age:");
-    let active_mid_age: Vec<User> = db
+    let query = db
         .get_rows()
         .from("users")
         .where_gte("age", json!(25))
         .where_lte("age", json!(40))
-        .order_by("age", cargobase::SortOrder::Asc)
-        .all()
-        .await;
+        .order_by("age", cargobase::SortOrder::Asc);
+    println!("   Query: {}", query);
+    let active_mid_age: Vec<User> = query.all().await;
     println!("   Found {} users:", active_mid_age.len());
     for user in &active_mid_age {
         println!("     - {} (age: {}, status: {})", user.name, user.age, user.status);
@@ -156,13 +160,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 8. Pagination: Get first 2 users ordered by name
     println!("\n8️⃣  Get first 2 users (paginated, ordered by name):");
-    let page1: Vec<User> = db
+    let query = db
         .get_rows()
         .from("users")
         .order_by("name", cargobase::SortOrder::Asc)
-        .limit(2)
-        .all()
-        .await;
+        .limit(2);
+    println!("   Query: {}", query);
+    let page1: Vec<User> = query.all().await;
     println!("   Page 1:");
     for user in &page1 {
         println!("     - {}", user.name);
@@ -186,6 +190,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 10. Display table
     println!("\n🔟 Display users table:");
     db.reload().await?; // Ensure we have latest state
+    if let Some(table) = db.tables.get("users") {
+        println!("   Table info: {}", table);
+    }
     db.view_table("users");
 
     // 11. List all tables

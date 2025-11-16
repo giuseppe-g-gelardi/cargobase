@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::fmt;
 
 /// Comparison operators for query conditions
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -24,6 +25,22 @@ pub enum ComparisonOp {
     NotIn,
 }
 
+impl fmt::Display for ComparisonOp {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ComparisonOp::Eq => write!(f, "="),
+            ComparisonOp::Ne => write!(f, "!="),
+            ComparisonOp::Gt => write!(f, ">"),
+            ComparisonOp::Gte => write!(f, ">="),
+            ComparisonOp::Lt => write!(f, "<"),
+            ComparisonOp::Lte => write!(f, "<="),
+            ComparisonOp::Like => write!(f, "LIKE"),
+            ComparisonOp::In => write!(f, "IN"),
+            ComparisonOp::NotIn => write!(f, "NOT IN"),
+        }
+    }
+}
+
 /// Sort order for ORDER BY clauses
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SortOrder {
@@ -33,6 +50,15 @@ pub enum SortOrder {
     Desc,
 }
 
+impl fmt::Display for SortOrder {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SortOrder::Asc => write!(f, "ASC"),
+            SortOrder::Desc => write!(f, "DESC"),
+        }
+    }
+}
+
 /// Logical operators for combining conditions
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum LogicalOp {
@@ -40,6 +66,15 @@ pub enum LogicalOp {
     And,
     /// OR condition
     Or,
+}
+
+impl fmt::Display for LogicalOp {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            LogicalOp::And => write!(f, "AND"),
+            LogicalOp::Or => write!(f, "OR"),
+        }
+    }
 }
 
 /// A single query condition
@@ -155,6 +190,27 @@ impl Condition {
         } else {
             false
         }
+    }
+}
+
+impl fmt::Display for Condition {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // Format value for display
+        let value_str = match &self.value {
+            Value::String(s) => format!("'{}'", s),
+            Value::Array(arr) => format!("({})", 
+                arr.iter()
+                    .map(|v| match v {
+                        Value::String(s) => format!("'{}'", s),
+                        other => other.to_string(),
+                    })
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+            other => other.to_string(),
+        };
+        
+        write!(f, "{} {} {}", self.field, self.operator, value_str)
     }
 }
 

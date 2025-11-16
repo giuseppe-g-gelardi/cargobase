@@ -1,5 +1,6 @@
 use std::{borrow::Cow, collections::HashMap};
 use std::path::Path;
+use std::fmt;
 use tracing;
 
 use crate::{Database, DatabaseError, Operation, Query, Table, View};
@@ -323,3 +324,20 @@ async fn test_get_table_mut() {
 }
 
 } // end of tests module
+
+impl fmt::Display for Database {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let table_names: Vec<_> = self.tables.keys().cloned().collect();
+        write!(
+            f,
+            "Database '{}' ({} tables: {})",
+            self.name,
+            self.tables.len(),
+            if table_names.is_empty() {
+                "none".to_string()
+            } else {
+                table_names.join(", ")
+            }
+        )
+    }
+}
