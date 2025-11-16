@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{borrow::Cow, collections::HashMap};
 
 use cargobase::{setup_temp_db, Column, Columns, Database, DatabaseError, Operation, Table};
 
@@ -17,10 +17,12 @@ struct TestData {
 async fn test_database_new() {
     let db = setup_temp_db().await;
 
-    let db_name = &db.name.to_string();
+    // let db_name = &db.name.to_string();
+    let db_name: &str = db.name.as_ref();
     let fnn = format!("{db_name}.json");
 
-    assert_eq!(db.name, db_name.to_string());
+    // assert_eq!(db.name, db_name.to_string());
+    assert_eq!(db.name, Cow::Owned(db.name.to_string()));
     assert_eq!(db.file_name.to_string_lossy(), fnn);
     assert_eq!(db.tables.len(), 1); // the setup_temp_db function adds a table
 }
@@ -39,7 +41,7 @@ async fn test_add_table_success() {
     // this test does not use the setup_temp_db function
     // because it needs to test the creation of a new database and table
     tokio::fs::remove_file("test_db.json").await.ok();
-    let mut db = Database::new("test_db").await;
+    let mut db = Database::new(Cow::Borrowed("test_db")).await;
 
     let test_columns = Columns::from_struct::<TestData>(true);
     let mut test_table = Table::new("TestTable".to_string(), test_columns);

@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use serde::{Deserialize, Serialize};
 use tempfile::NamedTempFile;
 
@@ -12,13 +14,17 @@ struct TestData {
 pub async fn setup_temp_db() -> Database {
     let temp_file = NamedTempFile::new().expect("Failed to create a temporary file");
     let db_path = temp_file.path().to_str().unwrap().to_string();
+    let db_path_cow: Cow<str> = Cow::Owned(db_path);
 
     // Initialize the test database
-    let mut db = Database::new(&db_path).await;
+    let mut db = Database::new(db_path_cow).await;
     let test_columns = Columns::from_struct::<TestData>(true);
 
     let mut table = Table::new("TestTable".to_string(), test_columns);
     db.add_table(&mut table).await.unwrap();
+
+    tracing::info!("Table added: {:?}", db.tables.keys());
+    println!("TABLEEEEEEE: {:?}", db.tables.keys());
 
     db.save_to_file().await.expect("Failed to save database");
 
@@ -31,7 +37,16 @@ mod tests {
 
     #[tokio::test]
     async fn test_setup_temp_db() {
-        let db = setup_temp_db().await;
+        // let db = setup_temp_db().await;
+
+        // assert_eq!(db.tables.len(), 1);
+        // assert!(db.tables.contains_key("TestTable"));
+
+        // let table = db.tables.get("TestTable").unwrap();
+
+        // assert_eq!(table.name, "TestTable");
+        let db_name: Cow<str> = Cow::Borrowed("test_db");
+        let db = Database::new(db_name).await;
 
         assert_eq!(db.tables.len(), 1);
         assert!(db.tables.contains_key("TestTable"));

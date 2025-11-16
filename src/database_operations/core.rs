@@ -1,12 +1,13 @@
-use std::collections::HashMap;
+use std::{borrow::Cow, collections::HashMap};
 use std::path::Path;
 use tracing;
 
 use crate::{Database, DatabaseError, Operation, Query, Table, View};
 
 impl Database {
-    pub async fn new(name: &str) -> Self {
-        let name = name.to_string();
+    pub async fn new(name: Cow<'_, str>) -> Self {
+        // let name = name.to_string();
+        let name = name.into_owned();
         let file_name = format!("{name}.json");
 
         if tokio::fs::metadata(&file_name).await.is_ok() {
