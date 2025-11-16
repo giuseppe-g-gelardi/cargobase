@@ -292,6 +292,10 @@ mod tests {
             operation: Operation::Read,
             update_data: None,
             row_data: None,
+            conditions: Vec::new(),
+            order_by: Vec::new(),
+            limit: None,
+            offset: None,
         };
 
         let updated_query = query.from("TestTable");
@@ -306,6 +310,10 @@ mod tests {
             operation: Operation::Update,
             update_data: None,
             row_data: None,
+            conditions: Vec::new(),
+            order_by: Vec::new(),
+            limit: None,
+            offset: None,
         };
 
         let data = json!({ "name": "Updated Name" });
@@ -323,6 +331,10 @@ mod tests {
             operation: Operation::Create,
             update_data: None,
             row_data: None,
+            conditions: Vec::new(),
+            order_by: Vec::new(),
+            limit: None,
+            offset: None,
         };
 
         let test_data = TestData {
@@ -380,6 +392,10 @@ mod tests {
             operation: Operation::Update,
             update_data: None,
             row_data: None,
+            conditions: Vec::new(),
+            order_by: Vec::new(),
+            limit: None,
+            offset: None,
         };
 
         let data = json!({ "name": "Updated Name" });

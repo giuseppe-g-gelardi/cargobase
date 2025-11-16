@@ -1,6 +1,8 @@
 pub mod query;
+pub mod operators;
 
 pub use query as query_operations;
+pub use operators::{ComparisonOp, Condition, ConditionGroup, LogicalOp, SortOrder};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -21,4 +23,8 @@ pub struct Query {
     pub operation: Operation,
     pub update_data: Option<Value>,
     pub row_data: Option<Value>,
+    pub conditions: Vec<ConditionGroup>,
+    pub order_by: Vec<(String, SortOrder)>,
+    pub limit: Option<usize>,
+    pub offset: Option<usize>,
 }

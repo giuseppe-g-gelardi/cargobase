@@ -37,16 +37,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_setup_temp_db() {
-        // let db = setup_temp_db().await;
-
-        // assert_eq!(db.tables.len(), 1);
-        // assert!(db.tables.contains_key("TestTable"));
-
-        // let table = db.tables.get("TestTable").unwrap();
-
-        // assert_eq!(table.name, "TestTable");
-        let db_name: Cow<str> = Cow::Borrowed("test_db");
-        let db = Database::new(db_name).await;
+        let db = setup_temp_db().await;
 
         assert_eq!(db.tables.len(), 1);
         assert!(db.tables.contains_key("TestTable"));

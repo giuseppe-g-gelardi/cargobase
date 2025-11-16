@@ -184,6 +184,10 @@ impl Database {
             operation: Operation::Create,
             update_data: None,
             row_data: None,
+            conditions: Vec::new(),
+            order_by: Vec::new(),
+            limit: None,
+            offset: None,
         }
     }
 
@@ -194,6 +198,10 @@ impl Database {
             operation: Operation::Read,
             update_data: None,
             row_data: None,
+            conditions: Vec::new(),
+            order_by: Vec::new(),
+            limit: None,
+            offset: None,
         }
     }
 
@@ -204,6 +212,10 @@ impl Database {
             operation: Operation::Read,
             update_data: None,
             row_data: None,
+            conditions: Vec::new(),
+            order_by: Vec::new(),
+            limit: None,
+            offset: None,
         }
     }
 
@@ -214,6 +226,10 @@ impl Database {
             operation: Operation::Delete,
             update_data: None,
             row_data: None,
+            conditions: Vec::new(),
+            order_by: Vec::new(),
+            limit: None,
+            offset: None,
         }
     }
 
@@ -224,13 +240,21 @@ impl Database {
             operation: Operation::Update,
             update_data: None,
             row_data: None,
+            conditions: Vec::new(),
+            order_by: Vec::new(),
+            limit: None,
+            offset: None,
         }
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::NamedTempFile;
+
 #[tokio::test]
 async fn test_save_to_file() {
-    use tempfile::NamedTempFile;
 
     let temp_file = NamedTempFile::new().expect("Failed to create a temporary file");
     let db_path = temp_file.path().to_path_buf();
@@ -250,8 +274,6 @@ async fn test_save_to_file() {
 
 #[tokio::test]
 async fn test_load_from_file() {
-    use tempfile::NamedTempFile;
-
     let temp_file = NamedTempFile::new().expect("Failed to create a temporary file");
     let db_path = temp_file.path().to_path_buf();
 
@@ -290,3 +312,5 @@ async fn test_get_table_mut() {
     let table = db.get_table_mut("test_table_mut");
     assert!(table.is_some());
 }
+
+} // end of tests module

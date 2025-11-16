@@ -7,24 +7,81 @@ license = "MIT"
 description = "A local, in-memory, and file-based key-value store."
 homepage = "https://github.com/giuseppe-g-gelardi/cargobase"
 repository = "https://github.com/giuseppe-g-gelardi/cargobase"
-documentation = "TODO: https://docs.rs/cargobase"
+documentation = "https://docs.rs/cargobase"
 readme = "README.md"
-keywords = ["key-value", "store", "database", "in-memory", "file-based", "utility", "local", "rust"]
-categories = ["data-management", "development-tools", "utilities", "database"]
+keywords = ["database", "json", "key-value", "embedded", "async"]
+categories = ["database-implementations", "data-structures", "development-tools"]
+
+[features]
+# Default features - minimal but useful set
+default = ["async", "uuid-keys"]
+
+# Core features
+async = ["tokio"]
+sync = []
+
+# Performance features
+compression = ["flate2"]
+encryption = ["aes-gcm", "rand"]
+in-memory = []
+caching = ["moka"]
+
+# Advanced features
+indexing = []
+transactions = []
+migrations = []
+full-text-search = ["tantivy"]
+
+# Export/Import
+csv = ["csv-crate"]
+json-export = []
+backup = []
+
+# Logging & Debugging
+detailed-logging = ["tracing-subscriber/env-filter"]
+query-stats = []
+
+# Type support
+uuid-keys = ["uuid"]
+integer-keys = []
+timestamps = ["chrono"]
+
+# Validation
+strict-validation = []
+foreign-keys = []
+
+# Testing
+test-utils = ["tempfile"]
 
 [dependencies]
-serde = { version = "1.0.215", features = ["derive"] }
-serde_json = { version = "1.0.132", features = ["raw_value"] }
-serde_derive = "1.0.188"
-serde-reflection = "0.4.0"
-base64 = "0.22.1"
-tokio = { version = "1", features = ["full"] }
-uuid = {version ="1.11.0", features = ["v4"] }
-thiserror = "2.0.3"
-tempfile = "3.14.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = { version = "1.0", features = ["raw_value"] }
+serde_derive = "1.0"
+serde-reflection = "0.4"
+thiserror = "2.0"
 tracing = "0.1"
+regex = "1.10"
+
+# Optional dependencies
+tokio = { version = "1", features = ["fs", "io-util", "rt-multi-thread"], optional = true }
+uuid = { version = "1.11", features = ["v4", "serde"], optional = true }
+flate2 = { version = "1.0", optional = true }
+aes-gcm = { version = "0.10", optional = true }
+rand = { version = "0.8", optional = true }
+moka = { version = "0.12", features = ["future"], optional = true }
+tantivy = { version = "0.22", optional = true }
+csv-crate = { package = "csv", version = "1.3", optional = true }
+chrono = { version = "0.4", features = ["serde"], optional = true }
+tempfile = { version = "3.14", optional = true }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full", "test-util", "macros"] }
+tempfile = "3.14"
 tracing-subscriber = "0.3"
-tracing-test = "0.2.5"
+tracing-test = "0.2"
+base64 = "0.22"
+uuid = { version = "1.11", features = ["v4", "serde"] }
+cargobase = { path = ".", features = ["test-utils"] }
 
 [lib]
 path = "src/lib.rs"
@@ -35,4 +92,5 @@ members = ["examples/*"]
 [[test]]
 name = "core"
 path = "tests/core.rs"
+required-features = ["test-utils"]
 
