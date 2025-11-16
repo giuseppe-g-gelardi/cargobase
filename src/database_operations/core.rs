@@ -174,6 +174,15 @@ impl Database {
         }
         table
     }
+
+    /// Reload the database from file to sync in-memory state
+    pub async fn reload(&mut self) -> Result<(), DatabaseError> {
+        let updated = Self::load_from_file(&self.file_name)
+            .await
+            .map_err(DatabaseError::LoadError)?;
+        self.tables = updated.tables;
+        Ok(())
+    }
 }
 
 impl Database {

@@ -76,6 +76,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("  ➕ Added user: {}", user.name);
     }
 
+    // Reload to sync in-memory state
+    db.reload().await?;
+
     println!("\n📊 Database Operations Demo:\n");
 
     // 1. Get all users
@@ -110,6 +113,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("   Updated: {} - new status: {}, new age: {}", u.name, u.status, u.age);
     }
 
+    // Reload after update
+    db.reload().await?;
+
     // 4. Count records
     println!("\n4️⃣  Count users in table:");
     let count = db.count_rows("users")?;
@@ -120,17 +126,75 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let exists = db.record_exists("users", "1");
     println!("   User with id='1' exists: {}", exists);
 
-    // 6. Display table
-    println!("\n6️⃣  Display users table:");
+    // 6. Advanced Query: Find users over 30
+    println!("\n6️⃣  Find users over 30 years old:");
+    let seniors: Vec<User> = db
+        .get_rows()
+        .from("users")
+        .where_gt("age", json!(30))
+        .all()
+        .await;
+    println!("   Found {} users over 30:", seniors.len());
+    for user in &seniors {
+        println!("     - {} (age: {})", user.name, user.age);
+    }
+
+    // 7. Advanced Query: Active users between 25-40, sorted by age
+    println!("\n7️⃣  Find active users aged 25-40, sorted by age:");
+    let active_mid_age: Vec<User> = db
+        .get_rows()
+        .from("users")
+        .where_gte("age", json!(25))
+        .where_lte("age", json!(40))
+        .order_by("age", cargobase::SortOrder::Asc)
+        .all()
+        .await;
+    println!("   Found {} users:", active_mid_age.len());
+    for user in &active_mid_age {
+        println!("     - {} (age: {}, status: {})", user.name, user.age, user.status);
+    }
+
+    // 8. Pagination: Get first 2 users ordered by name
+    println!("\n8️⃣  Get first 2 users (paginated, ordered by name):");
+    let page1: Vec<User> = db
+        .get_rows()
+        .from("users")
+        .order_by("name", cargobase::SortOrder::Asc)
+        .limit(2)
+        .all()
+        .await;
+    println!("   Page 1:");
+    for user in &page1 {
+        println!("     - {}", user.name);
+    }
+
+    // 9. Get next page
+    println!("\n9️⃣  Get next 2 users (page 2):");
+    let page2: Vec<User> = db
+        .get_rows()
+        .from("users")
+        .order_by("name", cargobase::SortOrder::Asc)
+        .offset(2)
+        .limit(2)
+        .all()
+        .await;
+    println!("   Page 2:");
+    for user in &page2 {
+        println!("     - {}", user.name);
+    }
+
+    // 10. Display table
+    println!("\n🔟 Display users table:");
+    db.reload().await?; // Ensure we have latest state
     db.view_table("users");
 
-    // 7. List all tables
-    println!("\n7️⃣  List all tables:");
+    // 11. List all tables
+    println!("\n1️⃣1️⃣  List all tables:");
     let tables = db.list_tables();
     println!("   Tables: {:?}", tables);
 
-    // 8. Delete a user
-    println!("\n8️⃣  Delete user with id='4':");
+    // 12. Delete a user
+    println!("\n1️⃣2️⃣  Delete user with id='4':");
     let deleted: Option<User> = db
         .delete_single()
         .from("users")
@@ -142,6 +206,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Show final state
     println!("\n📊 Final table state:");
+    db.reload().await?; // Reload to see the deleted state
     db.view_table("users");
 
     // Cleanup

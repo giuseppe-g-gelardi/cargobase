@@ -22,6 +22,95 @@ impl Query {
         self
     }
 
+    // Enhanced query builder methods
+    pub fn where_gt(mut self, field: &str, value: impl Into<Value>) -> Self {
+        self.add_condition(field, crate::ComparisonOp::Gt, value.into());
+        self
+    }
+
+    pub fn where_lt(mut self, field: &str, value: impl Into<Value>) -> Self {
+        self.add_condition(field, crate::ComparisonOp::Lt, value.into());
+        self
+    }
+
+    pub fn where_gte(mut self, field: &str, value: impl Into<Value>) -> Self {
+        self.add_condition(field, crate::ComparisonOp::Gte, value.into());
+        self
+    }
+
+    pub fn where_lte(mut self, field: &str, value: impl Into<Value>) -> Self {
+        self.add_condition(field, crate::ComparisonOp::Lte, value.into());
+        self
+    }
+
+    pub fn where_ne(mut self, field: &str, value: impl Into<Value>) -> Self {
+        self.add_condition(field, crate::ComparisonOp::Ne, value.into());
+        self
+    }
+
+    pub fn where_like(mut self, field: &str, pattern: impl Into<String>) -> Self {
+        self.add_condition(field, crate::ComparisonOp::Like, Value::String(pattern.into()));
+        self
+    }
+
+    pub fn where_in(mut self, field: &str, values: Vec<Value>) -> Self {
+        self.add_condition(field, crate::ComparisonOp::In, Value::Array(values));
+        self
+    }
+
+    pub fn where_not_in(mut self, field: &str, values: Vec<Value>) -> Self {
+        self.add_condition(field, crate::ComparisonOp::NotIn, Value::Array(values));
+        self
+    }
+
+    pub fn and(mut self) -> Self {
+        // Start a new AND condition group
+        if !self.conditions.is_empty() {
+            self.conditions.push(crate::ConditionGroup::new(crate::LogicalOp::And));
+        }
+        self
+    }
+
+    pub fn or(mut self) -> Self {
+        // Start a new OR condition group
+        if !self.conditions.is_empty() {
+            self.conditions.push(crate::ConditionGroup::new(crate::LogicalOp::Or));
+        }
+        self
+    }
+
+    pub fn order_by(mut self, field: impl Into<String>, order: crate::SortOrder) -> Self {
+        self.order_by.push((field.into(), order));
+        self
+    }
+
+    pub fn limit(mut self, limit: usize) -> Self {
+        self.limit = Some(limit);
+        self
+    }
+
+    pub fn offset(mut self, offset: usize) -> Self {
+        self.offset = Some(offset);
+        self
+    }
+
+    // Helper method to add conditions to the appropriate group
+    fn add_condition(&mut self, field: &str, operator: crate::ComparisonOp, value: Value) {
+        let condition = crate::Condition::new(field, operator, value);
+        
+        if self.conditions.is_empty() {
+            // First condition - create an AND group by default
+            let mut group = crate::ConditionGroup::new(crate::LogicalOp::And);
+            group.add_condition(condition);
+            self.conditions.push(group);
+        } else {
+            // Add to the last group
+            if let Some(last_group) = self.conditions.last_mut() {
+                last_group.add_condition(condition);
+            }
+        }
+    }
+
     // pub async fn where_eq<T: DeserializeOwned + Default>(
     pub async fn where_eq<T>(self, key: &str, value: &str) -> Result<Option<T>, DatabaseError>
     where
@@ -250,10 +339,34 @@ impl Query {
     {
         if let Some(table_name) = &self.table_name {
             if let Some(table) = db.tables.get(table_name) {
-                table
-                    .rows
-                    .values()
-                    // .iter()
+                let mut rows: Vec<&Row> = table.rows.values().collect();
+
+                // Apply condition filters
+                if !self.conditions.is_empty() {
+                    rows.retain(|row| self.evaluate_conditions(&row.data));
+                }
+
+                // Apply sorting
+                if !self.order_by.is_empty() {
+                    rows.sort_by(|a, b| self.compare_rows(a, b));
+                }
+
+                // Apply offset
+                let start = self.offset.unwrap_or(0);
+                if start >= rows.len() {
+                    return Vec::new();
+                }
+
+                // Apply limit
+                let end = if let Some(limit) = self.limit {
+                    std::cmp::min(start + limit, rows.len())
+                } else {
+                    rows.len()
+                };
+
+                // Convert to result type
+                rows[start..end]
+                    .iter()
                     .filter_map(|row| serde_json::from_value(row.data.clone()).ok())
                     .collect()
             } else {
@@ -261,6 +374,60 @@ impl Query {
             }
         } else {
             Vec::new()
+        }
+    }
+
+    // Helper: Evaluate all condition groups (they're combined with AND by default)
+    fn evaluate_conditions(&self, row_data: &Value) -> bool {
+        if self.conditions.is_empty() {
+            return true;
+        }
+
+        // All condition groups must be true (implicitly ANDed together)
+        self.conditions.iter().all(|group| group.evaluate(row_data))
+    }
+
+    // Helper: Compare two rows based on order_by clauses
+    fn compare_rows(&self, a: &Row, b: &Row) -> std::cmp::Ordering {
+        use std::cmp::Ordering;
+
+        for (field, sort_order) in &self.order_by {
+            let a_val = a.data.get(field);
+            let b_val = b.data.get(field);
+
+            let ordering = match (a_val, b_val) {
+                (Some(a_v), Some(b_v)) => self.compare_values(a_v, b_v),
+                (Some(_), None) => Ordering::Greater,
+                (None, Some(_)) => Ordering::Less,
+                (None, None) => Ordering::Equal,
+            };
+
+            if ordering != Ordering::Equal {
+                return match sort_order {
+                    crate::SortOrder::Asc => ordering,
+                    crate::SortOrder::Desc => ordering.reverse(),
+                };
+            }
+        }
+
+        Ordering::Equal
+    }
+
+    // Helper: Compare two JSON values
+    fn compare_values(&self, a: &Value, b: &Value) -> std::cmp::Ordering {
+        use std::cmp::Ordering;
+
+        match (a, b) {
+            (Value::Number(a_num), Value::Number(b_num)) => {
+                if let (Some(a_f), Some(b_f)) = (a_num.as_f64(), b_num.as_f64()) {
+                    a_f.partial_cmp(&b_f).unwrap_or(Ordering::Equal)
+                } else {
+                    Ordering::Equal
+                }
+            }
+            (Value::String(a_str), Value::String(b_str)) => a_str.cmp(b_str),
+            (Value::Bool(a_bool), Value::Bool(b_bool)) => a_bool.cmp(b_bool),
+            _ => Ordering::Equal,
         }
     }
 
@@ -532,5 +699,264 @@ mod tests {
 
         assert!(deleted_record.is_none(), "Expected record to be deleted");
         assert!(rows.is_empty(), "Expected all records to be deleted");
+    }
+
+    // New tests for enhanced query operations
+    #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+    struct Person {
+        id: String,
+        name: String,
+        age: u32,
+        status: String,
+    }
+
+    async fn setup_person_db() -> Database {
+        use crate::{Columns, Table};
+        let mut db = setup_temp_db().await;
+        
+        // Create a proper table for Person struct
+        let person_columns = Columns::from_struct::<Person>(true);
+        let mut person_table = Table::new("PersonTable".to_string(), person_columns);
+        db.add_table(&mut person_table).await.expect("Failed to create PersonTable");
+        
+        let people = vec![
+            Person { id: "1".into(), name: "Alice".into(), age: 25, status: "active".into() },
+            Person { id: "2".into(), name: "Bob".into(), age: 35, status: "active".into() },
+            Person { id: "3".into(), name: "Charlie".into(), age: 45, status: "inactive".into() },
+            Person { id: "4".into(), name: "Diana".into(), age: 30, status: "active".into() },
+            Person { id: "5".into(), name: "Eve".into(), age: 28, status: "inactive".into() },
+        ];
+
+        for person in people {
+            db.add_row()
+                .from("PersonTable")
+                .data_from_struct(person)
+                .execute_add()
+                .await
+                .expect("Failed to add person");
+        }
+
+        db
+    }
+
+    #[tokio::test]
+    async fn test_where_gt() {
+        let db = setup_person_db().await;
+
+        let people: Vec<Person> = db
+            .get_rows()
+            .from("PersonTable")
+            .where_gt("age", 30)
+            .all()
+            .await;
+
+        assert_eq!(people.len(), 2, "Should find 2 people over 30");
+        assert!(people.iter().all(|p| p.age > 30));
+    }
+
+    #[tokio::test]
+    async fn test_where_lt() {
+        let db = setup_person_db().await;
+
+        let people: Vec<Person> = db
+            .get_rows()
+            .from("PersonTable")
+            .where_lt("age", 30)
+            .all()
+            .await;
+
+        assert_eq!(people.len(), 2, "Should find 2 people under 30");
+        assert!(people.iter().all(|p| p.age < 30));
+    }
+
+    #[tokio::test]
+    async fn test_where_gte() {
+        let db = setup_person_db().await;
+
+        let people: Vec<Person> = db
+            .get_rows()
+            .from("PersonTable")
+            .where_gte("age", 30)
+            .all()
+            .await;
+
+        assert_eq!(people.len(), 3, "Should find 3 people 30 or older");
+        assert!(people.iter().all(|p| p.age >= 30));
+    }
+
+    #[tokio::test]
+    async fn test_where_lte() {
+        let db = setup_person_db().await;
+
+        let people: Vec<Person> = db
+            .get_rows()
+            .from("PersonTable")
+            .where_lte("age", 30)
+            .all()
+            .await;
+
+        assert_eq!(people.len(), 3, "Should find 3 people 30 or younger");
+        assert!(people.iter().all(|p| p.age <= 30));
+    }
+
+    #[tokio::test]
+    async fn test_order_by_asc() {
+        let db = setup_person_db().await;
+
+        let people: Vec<Person> = db
+            .get_rows()
+            .from("PersonTable")
+            .order_by("name", crate::SortOrder::Asc)
+            .all()
+            .await;
+
+        assert_eq!(people.len(), 5);
+        assert_eq!(people[0].name, "Alice");
+        assert_eq!(people[1].name, "Bob");
+        assert_eq!(people[2].name, "Charlie");
+        assert_eq!(people[3].name, "Diana");
+        assert_eq!(people[4].name, "Eve");
+    }
+
+    #[tokio::test]
+    async fn test_order_by_desc() {
+        let db = setup_person_db().await;
+
+        let people: Vec<Person> = db
+            .get_rows()
+            .from("PersonTable")
+            .order_by("age", crate::SortOrder::Desc)
+            .all()
+            .await;
+
+        assert_eq!(people.len(), 5);
+        assert_eq!(people[0].age, 45);
+        assert_eq!(people[1].age, 35);
+        assert_eq!(people[2].age, 30);
+    }
+
+    #[tokio::test]
+    async fn test_limit() {
+        let db = setup_person_db().await;
+
+        let people: Vec<Person> = db
+            .get_rows()
+            .from("PersonTable")
+            .limit(3)
+            .all()
+            .await;
+
+        assert_eq!(people.len(), 3, "Should return only 3 results");
+    }
+
+    #[tokio::test]
+    async fn test_offset() {
+        let db = setup_person_db().await;
+
+        let people: Vec<Person> = db
+            .get_rows()
+            .from("PersonTable")
+            .order_by("age", crate::SortOrder::Asc)
+            .offset(2)
+            .all()
+            .await;
+
+        assert_eq!(people.len(), 3, "Should skip first 2 results");
+        assert_eq!(people[0].age, 30);
+    }
+
+    #[tokio::test]
+    async fn test_limit_and_offset() {
+        let db = setup_person_db().await;
+
+        let people: Vec<Person> = db
+            .get_rows()
+            .from("PersonTable")
+            .order_by("age", crate::SortOrder::Asc)
+            .offset(1)
+            .limit(2)
+            .all()
+            .await;
+
+        assert_eq!(people.len(), 2, "Should return 2 results starting from offset 1");
+        assert_eq!(people[0].age, 28);
+        assert_eq!(people[1].age, 30);
+    }
+
+    #[tokio::test]
+    async fn test_complex_query_with_conditions() {
+        let db = setup_person_db().await;
+
+        // Find active people over 25, ordered by age, limit to 2
+        let people: Vec<Person> = db
+            .get_rows()
+            .from("PersonTable")
+            .where_gt("age", 25)
+            .order_by("age", crate::SortOrder::Asc)
+            .limit(2)
+            .all()
+            .await;
+
+        assert_eq!(people.len(), 2);
+        assert_eq!(people[0].age, 28);
+        assert_eq!(people[1].age, 30);
+    }
+
+    #[tokio::test]
+    async fn test_multiple_conditions_same_group() {
+        let db = setup_person_db().await;
+
+        // Should combine with AND - age > 25 AND age < 40
+        let people: Vec<Person> = db
+            .get_rows()
+            .from("PersonTable")
+            .where_gt("age", 25)
+            .where_lt("age", 40)
+            .all()
+            .await;
+
+        assert_eq!(people.len(), 3, "Should find 3 people between 25 and 40");
+        assert!(people.iter().all(|p| p.age > 25 && p.age < 40));
+    }
+
+    #[tokio::test]
+    async fn test_multi_column_sort() {
+        use crate::{Columns, Table};
+        let mut db = setup_temp_db().await;
+        
+        // Create PersonTable for this test
+        let person_columns = Columns::from_struct::<Person>(true);
+        let mut person_table = Table::new("PersonTable".to_string(), person_columns);
+        db.add_table(&mut person_table).await.expect("Failed to create PersonTable");
+
+        let people = vec![
+            Person { id: "1".into(), name: "Alice".into(), age: 30, status: "active".into() },
+            Person { id: "2".into(), name: "Bob".into(), age: 30, status: "active".into() },
+            Person { id: "3".into(), name: "Charlie".into(), age: 25, status: "active".into() },
+        ];
+
+        for person in people {
+            db.add_row()
+                .from("PersonTable")
+                .data_from_struct(person)
+                .execute_add()
+                .await
+                .expect("Failed to add person");
+        }
+
+        // Sort by age DESC, then by name ASC
+        let results: Vec<Person> = db
+            .get_rows()
+            .from("PersonTable")
+            .order_by("age", crate::SortOrder::Desc)
+            .order_by("name", crate::SortOrder::Asc)
+            .all()
+            .await;
+
+        assert_eq!(results.len(), 3);
+        // Age 30 comes first (DESC), and within age 30, Alice before Bob (ASC)
+        assert_eq!(results[0].name, "Alice");
+        assert_eq!(results[1].name, "Bob");
+        assert_eq!(results[2].name, "Charlie");
     }
 }
