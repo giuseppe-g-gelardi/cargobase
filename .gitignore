@@ -28,9 +28,4 @@ src/main.rs
 
 .env
 
-NOTES.md
-CONTRIBUTING.md
-PROGRESS.md 
-QUICKSTART.md
-START_HERE.md
-TODO.md
+/TODO
