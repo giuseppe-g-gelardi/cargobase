@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -227,5 +228,17 @@ mod tests {
         table.add_row(&mut db, row_data).await;
 
         assert!(logs_contain("Failed to save to file"));
+    }
+}
+
+impl fmt::Display for Table {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Table '{}' ({} rows, {} columns)",
+            self.name,
+            self.rows.len(),
+            self.columns.0.len()
+        )
     }
 }
