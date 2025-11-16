@@ -36,25 +36,34 @@ impl Database {
         }
     }
 
+    #[must_use]
     pub async fn drop_database(&self) -> Result<(), DatabaseError> {
-        if tokio::fs::remove_file(&self.file_name).await.is_err() {
-            tracing::error!(
-                "{}",
-                DatabaseError::DeleteError("Failed to delete database file".to_string())
-            );
-        }
+        tokio::fs::remove_file(&self.file_name)
+            .await
+            .map_err(|e| {
+                tracing::error!(
+                    "Failed to delete database file '{}': {}",
+                    self.file_name.display(),
+                    e
+                );
+                DatabaseError::DeleteError(format!(
+                    "Failed to delete database '{}': {}",
+                    self.name, e
+                ))
+            })?;
 
-        tracing::info!("Database `{}` dropped successfully", self.name);
+        tracing::info!("Database '{}' dropped successfully", self.name);
         Ok(())
     }
 
+    #[must_use]
     pub async fn add_table(&mut self, table: &mut Table) -> Result<(), DatabaseError> {
         if self.tables.contains_key(&table.name) {
             tracing::warn!(
-                "{}",
-                DatabaseError::TableAlreadyExists(table.name.to_string())
+                "Table '{}' already exists",
+                table.name
             );
-            return Ok(());
+            return Err(DatabaseError::TableAlreadyExists(table.name.clone()));
         }
 
         self.tables.insert(table.name.clone(), table.clone());
@@ -64,20 +73,21 @@ impl Database {
         Ok(())
     }
 
+    #[must_use]
     pub async fn drop_table(&mut self, table_name: &str) -> Result<(), DatabaseError> {
         let mut db = Database::load_from_file(&self.file_name)
             .await
             .map_err(DatabaseError::LoadError)?;
 
         if let Some(removed_table) = db.tables.remove(table_name) {
-            tracing::info!("Table `{}` dropped successfully", removed_table.name);
+            tracing::info!("Table '{}' dropped successfully", removed_table.name);
             db.save_to_file().await.map_err(DatabaseError::SaveError)?;
 
             self.tables = db.tables;
             Ok(())
         } else {
-            tracing::error!("{}", DatabaseError::TableNotFound(table_name.to_string()));
-            Ok(())
+            tracing::error!("Table '{}' not found", table_name);
+            Err(DatabaseError::TableNotFound(table_name.to_string()))
         }
     }
 
@@ -126,6 +136,7 @@ impl Database {
         Ok(())
     }
 
+    #[must_use]
     pub fn count_rows(&self, table_name: &str) -> Result<usize, DatabaseError> {
         if let Some(table) = self.tables.get(table_name) {
             Ok(table.rows.len())
@@ -177,6 +188,7 @@ impl Database {
     }
 
     /// Reload the database from file to sync in-memory state
+    #[must_use]
     pub async fn reload(&mut self) -> Result<(), DatabaseError> {
         let updated = Self::load_from_file(&self.file_name)
             .await

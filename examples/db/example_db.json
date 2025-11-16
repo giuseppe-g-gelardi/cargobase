@@ -1,0 +1,73 @@
+{
+  "name": "example_db",
+  "file_name": "example_db.json",
+  "tables": {
+    "users": {
+      "name": "users",
+      "rows": {
+        "3": {
+          "_id": "e9104171-5c61-4902-8925-34868f881f1b",
+          "data": {
+            "age": 43,
+            "email": "charlie@example.com",
+            "id": "3",
+            "name": "Charlie Brown",
+            "status": "active"
+          }
+        },
+        "2": {
+          "_id": "d5754ed3-e41f-4834-bd9b-e3dcac3da52f",
+          "data": {
+            "age": 35,
+            "email": "bob@example.com",
+            "id": "2",
+            "name": "Bob Smith",
+            "status": "active"
+          }
+        },
+        "1": {
+          "_id": "f10bdb17-4e57-421e-9b8e-b853c79783d4",
+          "data": {
+            "age": 28,
+            "email": "alice@example.com",
+            "id": "1",
+            "name": "Alice Johnson",
+            "status": "active"
+          }
+        },
+        "4": {
+          "_id": "ba112a5a-4a45-4329-81fe-25b44467da62",
+          "data": {
+            "age": 25,
+            "email": "diana@example.com",
+            "id": "4",
+            "name": "Diana Prince",
+            "status": "active"
+          }
+        }
+      },
+      "columns": [
+        {
+          "name": "id",
+          "required": true
+        },
+        {
+          "name": "name",
+          "required": true
+        },
+        {
+          "name": "age",
+          "required": true
+        },
+        {
+          "name": "email",
+          "required": true
+        },
+        {
+          "name": "status",
+          "required": false
+        }
+      ]
+    }
+  }
+}

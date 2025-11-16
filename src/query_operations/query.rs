@@ -158,6 +158,7 @@ impl Query {
         }
     }
 
+    #[must_use]
     pub async fn execute_add(self) -> Result<(), DatabaseError> {
         let mut db = Database::load_from_file(&self.db_file_name)
             .await
