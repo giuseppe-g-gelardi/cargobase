@@ -14,6 +14,9 @@ pub enum Operation {
     Read,
     Update,
     Delete,
+    BulkCreate,
+    BulkUpdate,
+    BulkDelete,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]

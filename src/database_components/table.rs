@@ -129,11 +129,17 @@ mod tests {
     #[tokio::test]
     async fn test_table_add_row_single() {
         let mut db = setup_temp_db().await;
-        let mut table = Table::new(
-            "TestTable".to_string(),
-            Columns::new(vec![Column::new("id", true), Column::new("name", true)]),
-        );
-        db.add_table(&mut table).await.unwrap();
+        // Use different table name or get existing table
+        let table_name = "TestTable";
+        if !db.tables.contains_key(table_name) {
+            let mut table = Table::new(
+                table_name.to_string(),
+                Columns::new(vec![Column::new("id", true), Column::new("name", true)]),
+            );
+            db.add_table(&mut table).await.unwrap();
+        }
+        
+        let mut table = db.tables.get(table_name).unwrap().clone();
 
         let row_data = json!({"id": "1", "name": "John Doe"});
         table.add_row(&mut db, row_data).await;
@@ -154,11 +160,17 @@ mod tests {
     #[tokio::test]
     async fn test_table_add_row_array() {
         let mut db = setup_temp_db().await;
-        let mut table = Table::new(
-            "TestTable".to_string(),
-            Columns::new(vec![Column::new("id", true), Column::new("name", true)]),
-        );
-        db.add_table(&mut table).await.unwrap();
+        // Use existing table from setup_temp_db
+        let table_name = "TestTable";
+        if !db.tables.contains_key(table_name) {
+            let mut table = Table::new(
+                table_name.to_string(),
+                Columns::new(vec![Column::new("id", true), Column::new("name", true)]),
+            );
+            db.add_table(&mut table).await.unwrap();
+        }
+        
+        let mut table = db.tables.get(table_name).unwrap().clone();
 
         let row_data = json!([
             {"id": "1", "name": "John Doe"},
@@ -215,11 +227,8 @@ mod tests {
     #[tokio::test]
     async fn test_table_add_row_save_failure() {
         let mut db = setup_temp_db().await;
-        let mut table = Table::new(
-            "TestTable".to_string(),
-            Columns::new(vec![Column::new("id", true), Column::new("name", true)]),
-        );
-        db.add_table(&mut table).await.unwrap();
+        // Use existing table from setup_temp_db
+        let mut table = db.tables.get("TestTable").unwrap().clone();
 
         // Simulate failure in saving
         db.file_name = "/invalid/path.json".into();

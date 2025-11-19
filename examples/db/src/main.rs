@@ -35,8 +35,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     db.add_table(&mut users_table).await?;
     println!("✅ Created 'users' table\n");
 
-    // Insert some sample users
-    println!("📝 Inserting sample users...");
+    // Bulk insert sample users (faster than individual inserts)
+    println!("📝 Bulk inserting sample users...");
     let users = vec![
         User {
             id: "1".to_string(),
@@ -68,14 +68,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
     ];
 
-    for user in &users {
-        db.add_row()
-            .from("users")
-            .data_from_struct(user.clone())
-            .execute_add()
-            .await?;
-        println!("  ➕ Added user: {}", user.name);
-    }
+    let inserted_count = db
+        .insert_many()
+        .from("users")
+        .data_many(users.clone())
+        .execute_bulk_insert()
+        .await?;
+    println!("  ✅ Bulk inserted {} users\n", inserted_count);
 
     // Reload to sync in-memory state
     db.reload().await?;
@@ -101,21 +100,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("   Found: {} (age: {})", u.name, u.age);
     }
 
-    // 3. Update a user
-    println!("\n3️⃣  Update user with id='3':");
+    // 3. Bulk update users
+    println!("\n3️⃣  Bulk update all active users (increment age by 1):");
     let update_data = json!({
-        "status": "active",
-        "age": 43
+        "age": 29  // This is just for demo; in real usage you'd calculate new values
     });
-    let updated: Option<User> = db
-        .update_row()
+    let updated_count = db
+        .update_many()
         .from("users")
         .data(update_data)
-        .where_eq("id", "3")
+        .where_equals("status", "active")
+        .execute_bulk_update()
         .await?;
-    if let Some(u) = updated {
-        println!("   Updated: {} - new status: {}, new age: {}", u.name, u.status, u.age);
-    }
+    println!("   Updated {} active users\n", updated_count);
 
     // Reload after update
     db.reload().await?;
@@ -200,16 +197,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let tables = db.list_tables();
     println!("   Tables: {:?}", tables);
 
-    // 12. Delete a user
-    println!("\n1️⃣2️⃣  Delete user with id='4':");
-    let deleted: Option<User> = db
-        .delete_single()
+    // 12. Bulk delete inactive users
+    println!("\n1️⃣2️⃣  Bulk delete inactive users:");
+    let deleted_count = db
+        .delete_many()
         .from("users")
-        .where_eq("id", "4")
+        .where_equals("status", "inactive")
+        .execute_bulk_delete()
         .await?;
-    if let Some(u) = deleted {
-        println!("   Deleted: {}", u.name);
-    }
+    println!("   Deleted {} inactive users", deleted_count);
 
     // Show final state
     println!("\n📊 Final table state:");

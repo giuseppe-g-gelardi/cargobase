@@ -14,11 +14,22 @@ impl Query {
     }
 
     pub fn data(mut self, data: Value) -> Self {
-        self.update_data = Some(data);
+        // For bulk operations, data should go into row_data if it's an array
+        if matches!(self.operation, Operation::BulkCreate) && data.is_array() {
+            self.row_data = Some(data);
+        } else {
+            self.update_data = Some(data);
+        }
         self
     }
 
     pub fn data_from_struct<T: Serialize>(mut self, data: T) -> Self {
+        self.row_data = Some(serde_json::to_value(data).expect("Failed to serialize data"));
+        self
+    }
+
+    /// For bulk operations - accepts Vec<T>
+    pub fn data_many<T: Serialize>(mut self, data: Vec<T>) -> Self {
         self.row_data = Some(serde_json::to_value(data).expect("Failed to serialize data"));
         self
     }
@@ -46,6 +57,13 @@ impl Query {
 
     pub fn where_ne(mut self, field: &str, value: impl Into<Value>) -> Self {
         self.add_condition(field, crate::ComparisonOp::Ne, value.into());
+        self
+    }
+
+    /// Builder-style equality check (use with bulk operations)
+    /// For single-row queries, use `where_eq().await` instead
+    pub fn where_equals(mut self, field: &str, value: impl Into<Value>) -> Self {
+        self.add_condition(field, crate::ComparisonOp::Eq, value.into());
         self
     }
 
@@ -154,10 +172,13 @@ impl Query {
                 db.save_to_file().await.map_err(DatabaseError::SaveError)?;
                 result
             }
-            Operation::Create => unreachable!(),
+            Operation::Create | Operation::BulkCreate | Operation::BulkUpdate | Operation::BulkDelete => {
+                unreachable!("Bulk operations should use their specific execute methods")
+            }
         }
     }
 
+    #[must_use]
     pub async fn execute_add(self) -> Result<(), DatabaseError> {
         let mut db = Database::load_from_file(&self.db_file_name)
             .await
@@ -194,6 +215,152 @@ impl Query {
                 "No data provided for the new row.".to_string(),
             ))
         }
+    }
+
+    /// Execute bulk insert - returns count of inserted rows
+    #[must_use]
+    pub async fn execute_bulk_insert(self) -> Result<usize, DatabaseError> {
+        let mut db = Database::load_from_file(&self.db_file_name)
+            .await
+            .map_err(DatabaseError::LoadError)?;
+
+        let table_name = self
+            .table_name
+            .clone()
+            .ok_or_else(|| DatabaseError::InvalidData("Table name not specified.".to_string()))?;
+
+        let table = db
+            .tables
+            .get_mut(&table_name)
+            .ok_or_else(|| DatabaseError::TableNotFound(table_name.clone()))?;
+
+        let rows_data = self
+            .row_data
+            .clone()
+            .ok_or_else(|| DatabaseError::InvalidData("No data provided for bulk insert.".to_string()))?;
+
+        // Handle both array and single object
+        let rows_array = match rows_data {
+            Value::Array(arr) => arr,
+            single_obj @ Value::Object(_) => vec![single_obj],
+            _ => return Err(DatabaseError::InvalidData(
+                "Bulk insert data must be an array or object.".to_string(),
+            )),
+        };
+
+        let mut inserted_count = 0;
+        let mut errors = Vec::new();
+
+        for (idx, row_data) in rows_array.iter().enumerate() {
+            // Validate each row
+            match table.columns.validate(row_data.clone()) {
+                Ok(()) => {
+                    if let Some(row_id) = row_data.get("id").and_then(|id| id.as_str()) {
+                        table.rows.insert(row_id.to_string(), Row::new(row_data.clone()));
+                        inserted_count += 1;
+                    } else {
+                        errors.push(format!("Row {}: No 'id' field provided", idx));
+                    }
+                }
+                Err(e) => {
+                    errors.push(format!("Row {}: {}", idx, e));
+                }
+            }
+        }
+
+        // Save to file once after all inserts
+        db.save_to_file().await.map_err(DatabaseError::SaveError)?;
+
+        if !errors.is_empty() {
+            tracing::warn!("Bulk insert completed with {} errors: {:?}", errors.len(), errors);
+        }
+
+        Ok(inserted_count)
+    }
+
+    /// Execute bulk update - returns count of updated rows
+    #[must_use]
+    pub async fn execute_bulk_update(self) -> Result<usize, DatabaseError> {
+        let mut db = Database::load_from_file(&self.db_file_name)
+            .await
+            .map_err(DatabaseError::LoadError)?;
+
+        let table_name = self
+            .table_name
+            .clone()
+            .ok_or_else(|| DatabaseError::InvalidData("Table name not specified.".to_string()))?;
+
+        let table = db
+            .tables
+            .get_mut(&table_name)
+            .ok_or_else(|| DatabaseError::TableNotFound(table_name.clone()))?;
+
+        let update_data = self
+            .update_data
+            .clone()
+            .ok_or_else(|| DatabaseError::InvalidData("No update data provided.".to_string()))?;
+
+        let mut updated_count = 0;
+
+        // Get all rows that match conditions
+        let mut rows_to_update: Vec<String> = Vec::new();
+        for (row_id, row) in table.rows.iter() {
+            if self.evaluate_conditions(&row.data) {
+                rows_to_update.push(row_id.clone());
+            }
+        }
+
+        // Update matching rows
+        for row_id in rows_to_update {
+            if let Some(row) = table.rows.get_mut(&row_id) {
+                self.apply_update_to_row(row, &Some(update_data.clone()))?;
+                updated_count += 1;
+            }
+        }
+
+        if updated_count > 0 {
+            db.save_to_file().await.map_err(DatabaseError::SaveError)?;
+        }
+
+        Ok(updated_count)
+    }
+
+    /// Execute bulk delete - returns count of deleted rows
+    #[must_use]
+    pub async fn execute_bulk_delete(self) -> Result<usize, DatabaseError> {
+        let mut db = Database::load_from_file(&self.db_file_name)
+            .await
+            .map_err(DatabaseError::LoadError)?;
+
+        let table_name = self
+            .table_name
+            .clone()
+            .ok_or_else(|| DatabaseError::InvalidData("Table name not specified.".to_string()))?;
+
+        let table = db
+            .tables
+            .get_mut(&table_name)
+            .ok_or_else(|| DatabaseError::TableNotFound(table_name.clone()))?;
+
+        // Find all rows that match conditions
+        let mut rows_to_delete: Vec<String> = Vec::new();
+        for (row_id, row) in table.rows.iter() {
+            if self.evaluate_conditions(&row.data) {
+                rows_to_delete.push(row_id.clone());
+            }
+        }
+
+        // Delete matching rows
+        let deleted_count = rows_to_delete.len();
+        for row_id in rows_to_delete {
+            table.rows.remove(&row_id);
+        }
+
+        if deleted_count > 0 {
+            db.save_to_file().await.map_err(DatabaseError::SaveError)?;
+        }
+
+        Ok(deleted_count)
     }
 
     fn execute_select<T>(
@@ -1190,5 +1357,252 @@ impl fmt::Display for Query {
         }
         
         write!(f, "]")
+    }
+}
+
+#[cfg(test)]
+mod bulk_tests {
+    use super::*;
+    use crate::util::setup_temp_db;
+    use serde::{Deserialize, Serialize};
+    use serde_json::json;
+
+    #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+    struct TestUser {
+        id: String,
+        name: String,
+        age: u32,
+        status: String,
+    }
+
+    async fn setup_users_db() -> Database {
+        use crate::{Columns, Table};
+        let mut db = setup_temp_db().await;
+        
+        // Create users table
+        let user_columns = Columns::from_struct::<TestUser>(true);
+        let mut users_table = Table::new("users".to_string(), user_columns);
+        db.add_table(&mut users_table).await.expect("Failed to create users table");
+        
+        db
+    }
+
+    #[tokio::test]
+    async fn test_bulk_insert_many_users() {
+        let mut db = setup_users_db().await;
+
+        let users = vec![
+            TestUser {
+                id: "1".to_string(),
+                name: "Alice".to_string(),
+                age: 30,
+                status: "active".to_string(),
+            },
+            TestUser {
+                id: "2".to_string(),
+                name: "Bob".to_string(),
+                age: 25,
+                status: "active".to_string(),
+            },
+            TestUser {
+                id: "3".to_string(),
+                name: "Charlie".to_string(),
+                age: 35,
+                status: "inactive".to_string(),
+            },
+        ];
+
+        let inserted = db
+            .insert_many()
+            .from("users")
+            .data_many(users)
+            .execute_bulk_insert()
+            .await
+            .expect("Bulk insert failed");
+
+        assert_eq!(inserted, 3);
+        
+        // Reload to sync state
+        db.reload().await.unwrap();
+        assert_eq!(db.count_rows("users").unwrap(), 3);
+    }
+
+    #[tokio::test]
+    async fn test_bulk_insert_with_json_array() {
+        let mut db = setup_users_db().await;
+
+        let users_json = json!([
+            {"id": "1", "name": "Alice", "age": 30, "status": "active"},
+            {"id": "2", "name": "Bob", "age": 25, "status": "active"},
+        ]);
+
+        let inserted = db
+            .insert_many()
+            .from("users")
+            .data(users_json)
+            .execute_bulk_insert()
+            .await
+            .expect("Bulk insert failed");
+
+        assert_eq!(inserted, 2);
+        
+        // Verify
+        db.reload().await.unwrap();
+        assert_eq!(db.count_rows("users").unwrap(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_bulk_update_matching_condition() {
+        let mut db = setup_users_db().await;
+
+        // Insert test data
+        let users = vec![
+            TestUser { id: "1".to_string(), name: "Alice".to_string(), age: 30, status: "active".to_string() },
+            TestUser { id: "2".to_string(), name: "Bob".to_string(), age: 25, status: "active".to_string() },
+            TestUser { id: "3".to_string(), name: "Charlie".to_string(), age: 35, status: "active".to_string() },
+        ];
+        db.insert_many().from("users").data_many(users).execute_bulk_insert().await.unwrap();
+
+        // Update all users with age > 28
+        let updated = db
+            .update_many()
+            .from("users")
+            .data(json!({"status": "senior"}))
+            .where_gt("age", 28)
+            .execute_bulk_update()
+            .await
+            .expect("Bulk update failed");
+
+        assert_eq!(updated, 2); // Alice (30) and Charlie (35)
+
+        // Verify updates
+        db.reload().await.unwrap();
+        let table = db.tables.get("users").unwrap();
+        let senior_count = table.rows.values()
+            .filter(|row| row.data.get("status").and_then(|v| v.as_str()) == Some("senior"))
+            .count();
+        
+        assert_eq!(senior_count, 2);
+    }
+
+    #[tokio::test]
+    async fn test_bulk_update_all_rows() {
+        let mut db = setup_users_db().await;
+
+        // Insert test data
+        let users = vec![
+            TestUser { id: "1".to_string(), name: "Alice".to_string(), age: 30, status: "active".to_string() },
+            TestUser { id: "2".to_string(), name: "Bob".to_string(), age: 25, status: "inactive".to_string() },
+        ];
+        db.insert_many().from("users").data_many(users).execute_bulk_insert().await.unwrap();
+
+        // Update all users (no conditions)
+        let updated = db
+            .update_many()
+            .from("users")
+            .data(json!({"status": "verified"}))
+            .execute_bulk_update()
+            .await
+            .expect("Bulk update failed");
+
+        assert_eq!(updated, 2);
+    }
+
+    #[tokio::test]
+    async fn test_bulk_delete_matching_condition() {
+        let mut db = setup_users_db().await;
+
+        // Insert test data
+        let users = vec![
+            TestUser { id: "1".to_string(), name: "Alice".to_string(), age: 30, status: "active".to_string() },
+            TestUser { id: "2".to_string(), name: "Bob".to_string(), age: 25, status: "inactive".to_string() },
+            TestUser { id: "3".to_string(), name: "Charlie".to_string(), age: 35, status: "inactive".to_string() },
+        ];
+        db.insert_many().from("users").data_many(users).execute_bulk_insert().await.unwrap();
+
+        // Delete all inactive users
+        let deleted = db
+            .delete_many()
+            .from("users")
+            .where_equals("status", "inactive")
+            .execute_bulk_delete()
+            .await
+            .expect("Bulk delete failed");
+
+        assert_eq!(deleted, 2); // Bob and Charlie
+
+        // Verify only Alice remains
+        db.reload().await.unwrap();
+        assert_eq!(db.count_rows("users").unwrap(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_bulk_delete_with_multiple_conditions() {
+        let mut db = setup_users_db().await;
+
+        // Insert test data
+        let users = vec![
+            TestUser { id: "1".to_string(), name: "Alice".to_string(), age: 30, status: "active".to_string() },
+            TestUser { id: "2".to_string(), name: "Bob".to_string(), age: 25, status: "active".to_string() },
+            TestUser { id: "3".to_string(), name: "Charlie".to_string(), age: 35, status: "active".to_string() },
+        ];
+        db.insert_many().from("users").data_many(users).execute_bulk_insert().await.unwrap();
+
+        // Delete users where age < 28 AND status = "active"
+        let deleted = db
+            .delete_many()
+            .from("users")
+            .where_lt("age", 28)
+            .where_equals("status", "active")
+            .execute_bulk_delete()
+            .await
+            .expect("Bulk delete failed");
+
+        assert_eq!(deleted, 1); // Only Bob (age 25)
+
+        // Verify Alice and Charlie remain
+        db.reload().await.unwrap();
+        assert_eq!(db.count_rows("users").unwrap(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_bulk_operations_performance() {
+        let mut db = setup_users_db().await;
+
+        // Generate 100 users
+        let users: Vec<TestUser> = (1..=100)
+            .map(|i| TestUser {
+                id: i.to_string(),
+                name: format!("User{}", i),
+                age: 20 + (i % 50),
+                status: if i % 2 == 0 { "active" } else { "inactive" }.to_string(),
+            })
+            .collect();
+
+        // Bulk insert should be fast
+        let start = std::time::Instant::now();
+        let inserted = db
+            .insert_many()
+            .from("users")
+            .data_many(users)
+            .execute_bulk_insert()
+            .await
+            .expect("Bulk insert failed");
+        let duration = start.elapsed();
+
+        assert_eq!(inserted, 100);
+        assert!(duration.as_millis() < 100, "Bulk insert took too long: {:?}", duration);
+
+        // Bulk update
+        let updated = db
+            .update_many()
+            .from("users")
+            .where_equals("status", "active")
+            .data(json!({"status": "verified"}))
+            .execute_bulk_update()
+            .await
+            .expect("Bulk update failed");
+
+        assert_eq!(updated, 50); // 50 even-numbered users
     }
 }

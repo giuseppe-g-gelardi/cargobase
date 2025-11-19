@@ -37,6 +37,28 @@ async fn test_drop_database() {
 }
 
 #[tokio::test]
+async fn test_drop_database_error_nonexistent() {
+    // Create a database but don't save it (file doesn't exist)
+    let db = Database {
+        name: "nonexistent_db".to_string(),
+        file_name: "nonexistent_db_xyz_12345.json".into(),
+        tables: HashMap::new(),
+    };
+
+    // Try to drop a database file that doesn't exist
+    let result = db.drop_database().await;
+
+    // Should return an error
+    assert!(result.is_err());
+    match result {
+        Err(DatabaseError::DeleteError(msg)) => {
+            assert!(msg.contains("nonexistent_db"));
+        }
+        _ => panic!("Expected DeleteError"),
+    }
+}
+
+#[tokio::test]
 async fn test_add_table_success() {
     // this test does not use the setup_temp_db function
     // because it needs to test the creation of a new database and table
@@ -66,8 +88,14 @@ async fn test_add_table_already_exists() {
     let mut duplicate_table = Table::new("TestTable".to_string(), columns);
     let result = db.add_table(&mut duplicate_table).await;
 
-    // Assert that the result is Ok(()) even when the table already exists
-    assert!(result.is_ok());
+    // Should return an error when table already exists
+    assert!(result.is_err());
+    match result {
+        Err(DatabaseError::TableAlreadyExists(name)) => {
+            assert_eq!(name, "TestTable");
+        }
+        _ => panic!("Expected TableAlreadyExists error"),
+    }
 
     // Ensure no duplicate tables exist
     assert_eq!(db.tables.len(), 1);
@@ -92,7 +120,14 @@ async fn test_drop_table_not_found() {
     let mut db = setup_temp_db().await;
     let result = db.drop_table("NonExistentTable").await;
 
-    assert!(result.is_ok());
+    // Should return an error when table doesn't exist
+    assert!(result.is_err());
+    match result {
+        Err(DatabaseError::TableNotFound(name)) => {
+            assert_eq!(name, "NonExistentTable");
+        }
+        _ => panic!("Expected TableNotFound error"),
+    }
 
     // // Assert that an error is returned
     // let db_error = DatabaseError::TableNotFound("NonExistentTable".to_string());

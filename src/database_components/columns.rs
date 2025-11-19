@@ -61,6 +61,7 @@ impl Columns {
     }
 
     // validate the columns
+    #[must_use]
     pub fn validate(&self, row_data: Value) -> Result<(), DatabaseError> {
         if let Value::Object(data) = row_data {
             for column in &self.0 {
