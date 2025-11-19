@@ -268,6 +268,51 @@ impl Database {
             offset: None,
         }
     }
+
+    /// Insert multiple rows at once (batch insert)
+    pub fn insert_many(&mut self) -> Query {
+        Query {
+            db_file_name: self.file_name.clone(),
+            table_name: None,
+            operation: Operation::BulkCreate,
+            update_data: None,
+            row_data: None,
+            conditions: Vec::new(),
+            order_by: Vec::new(),
+            limit: None,
+            offset: None,
+        }
+    }
+
+    /// Update multiple rows matching conditions
+    pub fn update_many(&self) -> Query {
+        Query {
+            db_file_name: self.file_name.clone(),
+            table_name: None,
+            operation: Operation::BulkUpdate,
+            update_data: None,
+            row_data: None,
+            conditions: Vec::new(),
+            order_by: Vec::new(),
+            limit: None,
+            offset: None,
+        }
+    }
+
+    /// Delete multiple rows matching conditions
+    pub fn delete_many(&self) -> Query {
+        Query {
+            db_file_name: self.file_name.clone(),
+            table_name: None,
+            operation: Operation::BulkDelete,
+            update_data: None,
+            row_data: None,
+            conditions: Vec::new(),
+            order_by: Vec::new(),
+            limit: None,
+            offset: None,
+        }
+    }
 }
 
 #[cfg(test)]
